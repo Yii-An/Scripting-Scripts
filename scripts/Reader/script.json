@@ -1,0 +1,23 @@
+{
+  "name": "Reader",
+  "intentInputTypes": [],
+  "version": "1.0.0",
+  "icon": "globe",
+  "author": {
+    "homepage": "https://github.com/Yii-An",
+    "email": "dktluo@icloud.com",
+    "name": "YiiAn"
+  },
+  "contributors": [],
+  "color": "#007AFF",
+  "localizedNames": {
+    "en": "Reader",
+    "zh": "阅读"
+  },
+  "localizedDescriptions": {
+    "en": "Read books from webpages",
+    "zh": "阅读"
+  },
+  "runInApp": false,
+  "description": "阅读"
+}
