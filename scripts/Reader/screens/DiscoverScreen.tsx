@@ -342,60 +342,88 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       ) : null}
 
       {/* 内容列表 */}
-      {!loading && items.length > 0 ? (
-        <Section header={<Text>共 {items.length} 项</Text>}>
-          {items.map((item, index) => (
-            <NavigationLink
-              key={item.url || index}
-              destination={<ChapterListScreen rule={rule} item={item} />}
-            >
-              <HStack spacing={12} padding={{ vertical: 8 }}>
-                {item.cover ? (
-                  <Image 
-                    imageUrl={item.cover} 
-                    frame={{ width: 60, height: 80 }}
-                    resizable
-                    scaleToFit
-                    clipShape={{ type: 'rect', cornerRadius: 8 }}
+        {!loading && items.length > 0 ? (
+          <>
+            {/* 分页控制 - 当 URL 支持分页时显示 */}
+            {(currentUrl.includes('$page') || currentUrl.includes('{{page}}') || nextUrl) ? (
+              <Section>
+                <HStack spacing={16} frame={{ maxWidth: "infinity" }}>
+                  <Spacer />
+                  <Button
+                    title="上一页"
+                    action={() => {
+                      if (page > 1) {
+                        loadDiscover(currentUrl, false, page - 1)
+                      }
+                    }}
+                    disabled={page <= 1 || loading}
+                    buttonStyle="bordered"
                   />
-                ) : (
-                  <VStack 
-                    frame={{ width: 60, height: 80 }} 
-                    background="secondarySystemFill"
-                    alignment="center"
-                    clipShape={{ type: 'rect', cornerRadius: 8 }}
-                  >
-                    <Text font="title2">📖</Text>
-                  </VStack>
-                )}
-                <VStack alignment="leading" spacing={4}>
-                  <Text font="headline" lineLimit={1}>{item.name}</Text>
-                  {item.author ? (
-                    <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
-                      {item.author}
-                    </Text>
-                  ) : null}
-                  {item.description ? (
-                    <Text font="caption" foregroundStyle="gray" lineLimit={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </VStack>
-                <Spacer />
-              </HStack>
-            </NavigationLink>
-          ))}
-          
-          {/* 加载更多按钮 - 只在有下一页时显示 */}
-          {nextUrl ? (
-            <Button
-              title={loadingMore ? "加载中..." : "加载更多"}
-              action={loadMore}
-              disabled={loadingMore}
-            />
-          ) : null}
-        </Section>
-      ) : null}
+                  <Text font="headline" foregroundStyle="label">
+                    第 {page} 页
+                  </Text>
+                  <Button
+                    title="下一页"
+                    action={() => {
+                      if (nextUrl) {
+                        loadDiscover(nextUrl, false, page + 1)
+                      } else if (currentUrl.includes('$page') || currentUrl.includes('{{page}}')) {
+                        loadDiscover(currentUrl, false, page + 1)
+                      }
+                    }}
+                    disabled={loading || (!nextUrl && !currentUrl.includes('$page') && !currentUrl.includes('{{page}}'))}
+                    buttonStyle="bordered"
+                  />
+                  <Spacer />
+                </HStack>
+              </Section>
+            ) : null}
+
+            <Section header={<Text>共 {items.length} 项</Text>}>
+              {items.map((item, index) => (
+                <NavigationLink
+                  key={item.url || index}
+                  destination={<ChapterListScreen rule={rule} item={item} />}
+                >
+                  <HStack spacing={12} padding={{ vertical: 8 }}>
+                    {item.cover ? (
+                      <Image 
+                        imageUrl={item.cover} 
+                        frame={{ width: 60, height: 80 }}
+                        resizable
+                        scaleToFit
+                        clipShape={{ type: 'rect', cornerRadius: 8 }}
+                      />
+                    ) : (
+                      <VStack 
+                        frame={{ width: 60, height: 80 }} 
+                        background="secondarySystemFill"
+                        alignment="center"
+                        clipShape={{ type: 'rect', cornerRadius: 8 }}
+                      >
+                        <Text font="title2">📖</Text>
+                      </VStack>
+                    )}
+                    <VStack alignment="leading" spacing={4}>
+                      <Text font="headline" lineLimit={1}>{item.name}</Text>
+                      {item.author ? (
+                        <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
+                          {item.author}
+                        </Text>
+                      ) : null}
+                      {item.description ? (
+                        <Text font="caption" foregroundStyle="gray" lineLimit={2}>
+                          {item.description}
+                        </Text>
+                      ) : null}
+                    </VStack>
+                    <Spacer />
+                  </HStack>
+                </NavigationLink>
+              ))}
+            </Section>
+          </>
+        ) : null}
 
       {/* 空状态 */}
       {!loading && items.length === 0 && !error ? (
