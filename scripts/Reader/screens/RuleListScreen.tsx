@@ -246,54 +246,58 @@ export function RuleListScreen() {
       <Form
         navigationTitle="书源管理"
         toolbar={{
-          primaryAction: (
-            <Button
-              title="添加"
-              action={() => setShowAddSheet(true)}
-            />
-          )
-        }}
-      >
-        {/* 操作按钮 */}
-        <Section>
-          <HStack>
-            <Button
-              title="从剪贴板导入"
-              action={handleImportFromClipboard}
-            />
-            <Spacer />
-            <Button
-              title="更新书源"
-              action={() => setShowUpdateSheet(true)}
-            />
-            <Spacer />
+          topBarLeading: (
             <Button
               title="刷新"
               action={fetchRules}
               disabled={loading}
             />
-          </HStack>
-          <HStack>
-            <Button
-              title="清空全部书源"
-              action={handleClearAll}
-              foregroundStyle="red"
-              disabled={loading || rules.length === 0}
-            />
-          </HStack>
-        </Section>
-
+          ),
+          topBarTrailing: (
+            <HStack spacing={16}>
+              <Button
+                title="添加"
+                action={() => setShowAddSheet(true)}
+              />
+              <Button
+                title="更多"
+                action={async () => {
+                  const result = await Dialog.actionSheet({
+                    title: '更多操作',
+                    actions: [
+                      { label: '从剪贴板导入' },
+                      { label: '从 URL 更新' },
+                      { label: '清空全部书源', destructive: true }
+                    ]
+                  })
+                  if (result === 0) {
+                    handleImportFromClipboard()
+                  } else if (result === 1) {
+                    setShowUpdateSheet(true)
+                  } else if (result === 2) {
+                    handleClearAll()
+                  }
+                }}
+              />
+            </HStack>
+          )
+        }}
+      >
         {/* 加载状态 */}
         {loading ? (
           <Section>
-            <Text foregroundStyle="secondaryLabel">加载中...</Text>
+            <VStack padding={60} alignment="center" frame={{ maxWidth: "infinity" }}>
+              <Text foregroundStyle="secondaryLabel">加载中...</Text>
+            </VStack>
           </Section>
         ) : null}
 
         {/* 错误信息 */}
         {error ? (
           <Section>
-            <Text foregroundStyle="red">{error}</Text>
+            <VStack padding={60} alignment="center" frame={{ maxWidth: "infinity" }}>
+              <Text foregroundStyle="red">{error}</Text>
+            </VStack>
           </Section>
         ) : null}
 
@@ -346,12 +350,20 @@ export function RuleListScreen() {
           </Section>
         ) : !loading ? (
           <Section>
-            <VStack padding={40} alignment="center" spacing={12}>
-              <Text font="largeTitle">📚</Text>
-              <Text foregroundStyle="secondaryLabel">暂无书源</Text>
-              <Text font="caption" foregroundStyle="tertiaryLabel">
-                点击"添加"或从剪贴板导入
-              </Text>
+            <VStack padding={60} alignment="center" spacing={20} frame={{ maxWidth: "infinity" }}>
+              <Text font={80}>📚</Text>
+              <VStack spacing={8}>
+                <Text font="title2" fontWeight="semibold">暂无书源</Text>
+                <Text font="subheadline" foregroundStyle="secondaryLabel">
+                  快来添加你喜欢的阅读源吧
+                </Text>
+              </VStack>
+              <Button
+                title="从剪贴板导入"
+                action={handleImportFromClipboard}
+                buttonStyle="borderedProminent"
+                controlSize="large"
+              />
             </VStack>
           </Section>
         ) : null}

@@ -16,6 +16,7 @@ import type { SearchItem, Rule } from '../types'
 import { ChapterListScreen } from './ChapterListScreen'
 import { RuleListScreen } from './RuleListScreen'
 import { getRule } from '../services/ruleStorage'
+import { logger } from '../services/logger'
 
 /**
  * 书架项类型
@@ -38,13 +39,13 @@ const BOOKSHELF_KEY = 'any-reader-bookshelf'
  */
 async function loadBookshelf(): Promise<BookshelfItem[]> {
   try {
-    console.log('加载书架')
+    logger.debug('加载书架数据')
     const data = await Keychain.get(BOOKSHELF_KEY)
     if (data) {
       return JSON.parse(data)
     }
-  } catch (e) {
-    console.error('加载书架失败:', e)
+  } catch {
+    logger.error('加载书架失败')
   }
   return []
 }
@@ -55,8 +56,8 @@ async function loadBookshelf(): Promise<BookshelfItem[]> {
 async function saveBookshelf(items: BookshelfItem[]): Promise<void> {
   try {
     await Keychain.set(BOOKSHELF_KEY, JSON.stringify(items))
-  } catch (e) {
-    console.error('保存书架失败:', e)
+  } catch {
+    logger.error('保存书架失败')
   }
 }
 

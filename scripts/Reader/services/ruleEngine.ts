@@ -11,6 +11,7 @@ import type {
   RuleResult 
 } from '../types'
 import { WebAnalyzer, buildFullUrl } from './webAnalyzer'
+import { logger } from './logger'
 
 /**
  * 默认桌面端 User-Agent
@@ -162,11 +163,16 @@ export async function search(
 ): Promise<RuleResult<SearchItem[]>> {
   const controller = new WebViewController()
   
+  // 设置日志上下文
+  logger.setContext({ page: '搜索', rule: rule.name, action: '搜索' })
+  logger.info(`开始搜索: "${keyword}"`)
+  
   try {
     // 输出规则配置信息
     onProgress?.(`【搜索页面】\n接收参数: keyword=${keyword}\n\n${formatSearchRules(rule)}`)
     
     if (!rule.search?.enabled || !rule.search?.url) {
+      logger.warn('规则未启用搜索功能')
       return { success: false, error: '规则未启用搜索功能' }
     }
     
@@ -178,6 +184,7 @@ export async function search(
       .replace(/\{\{page\}\}/g, '1')
     
     searchUrl = buildFullUrl(searchUrl, rule.host)
+    logger.request(searchUrl)
     
     onProgress?.(`正在搜索: ${searchUrl}`)
     
@@ -188,6 +195,7 @@ export async function search(
     onProgress?.('正在加载页面...')
     const loadSuccess = await controller.loadURL(searchUrl)
     if (!loadSuccess) {
+      logger.error('加载搜索页面失败')
       return { success: false, error: '加载搜索页面失败' }
     }
     
@@ -202,10 +210,12 @@ export async function search(
     
     // 检查必要规则
     if (!rule.search?.list) {
+      logger.warn('未配置搜索列表规则 (search.list)')
       return { success: false, error: '未配置搜索列表规则' }
     }
     
     onProgress?.('正在解析搜索结果...')
+    logger.info(`使用选择器: ${rule.search.list}`)
     
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
@@ -221,6 +231,7 @@ export async function search(
     })
     
     if (!result.success) {
+      logger.error(`解析失败: ${result.error}`)
       // 获取 HTML 预览用于调试
       const htmlPreview = await analyzer.getHtmlPreview(3000)
       return { 
@@ -231,6 +242,7 @@ export async function search(
     }
     
     if (!result.data || result.data.length === 0) {
+      logger.warn(`未找到搜索结果，节点数: ${result.debug?.nodeCount || 0}`)
       const htmlPreview = await analyzer.getHtmlPreview(3000)
       return { 
         success: false, 
@@ -238,6 +250,7 @@ export async function search(
       }
     }
     
+    logger.result(true, `找到 ${result.data.length} 个结果`)
     onProgress?.(`找到 ${result.data.length} 个结果`)
     
     return { 
@@ -248,6 +261,7 @@ export async function search(
     
   } finally {
     controller.dispose()
+    logger.clearContext()
   }
 }
 
@@ -261,12 +275,17 @@ export async function getChapterList(
 ): Promise<RuleResult<ChapterItem[]> & { nextUrl?: string }> {
   const controller = new WebViewController()
   
+  // 设置日志上下文
+  logger.setContext({ page: '章节列表', rule: rule.name, action: '获取章节' })
+  logger.info('开始获取章节列表')
+  
   try {
     // 输出规则配置信息
     onProgress?.(`【章节列表页面】\n接收参数: url=${url}\n\n${formatChapterRules(rule)}`)
     
     // 检查 URL 是否为空
     if (!url || !url.trim()) {
+      logger.error('章节列表 URL 为空')
       return { success: false, error: '章节列表 URL 为空，请检查搜索结果中的 searchResult 规则是否正确配置' }
     }
     
@@ -275,6 +294,7 @@ export async function getChapterList(
       ? buildFullUrl(rule.chapter.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
       : buildFullUrl(url, rule.host)
     
+    logger.request(chapterPageUrl)
     onProgress?.(`正在加载页面: ${chapterPageUrl}`)
     
     // 设置 User-Agent（使用规则配置或默认桌面端 UA）
@@ -283,6 +303,7 @@ export async function getChapterList(
     // 加载页面
     const loadSuccess = await controller.loadURL(chapterPageUrl)
     if (!loadSuccess) {
+      logger.error('加载章节页面失败')
       return { success: false, error: `加载章节页面失败: ${chapterPageUrl}` }
     }
     
@@ -294,10 +315,12 @@ export async function getChapterList(
     
     // 检查必要规则
     if (!rule.chapter?.list) {
+      logger.warn('未配置章节列表规则 (chapter.list)')
       return { success: false, error: '未配置章节列表规则' }
     }
     
     onProgress?.('正在解析章节列表...')
+    logger.info(`使用选择器: ${rule.chapter.list}`)
     
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
@@ -320,8 +343,11 @@ export async function getChapterList(
     }
     
     if (!result.success) {
+      logger.error(`解析失败: ${result.error}`)
       return { success: false, error: `解析失败: ${result.error}` }
     }
+    
+    logger.result(true, `找到 ${result.data?.length || 0} 个章节`)
     
     return { 
       success: true, 
@@ -332,6 +358,7 @@ export async function getChapterList(
     
   } finally {
     controller.dispose()
+    logger.clearContext()
   }
 }
 
@@ -345,6 +372,10 @@ export async function getContent(
 ): Promise<RuleResult<string[]> & { nextUrl?: string }> {
   const controller = new WebViewController()
   
+  // 设置日志上下文
+  logger.setContext({ page: '正文内容', rule: rule.name, action: '获取正文' })
+  logger.info('开始获取正文内容')
+  
   try {
     // 输出规则配置信息
     onProgress?.(`【正文内容页面】\n接收参数: url=${url}\n\n${formatContentRules(rule)}`)
@@ -354,6 +385,7 @@ export async function getContent(
       ? buildFullUrl(rule.content.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
       : buildFullUrl(url, rule.host)
     
+    logger.request(contentPageUrl)
     onProgress?.(`正在加载页面: ${contentPageUrl}`)
     
     // 设置 User-Agent（使用规则配置或默认桌面端 UA）
@@ -362,6 +394,7 @@ export async function getContent(
     // 加载页面
     const loadSuccess = await controller.loadURL(contentPageUrl)
     if (!loadSuccess) {
+      logger.error('加载正文页面失败')
       return { success: false, error: '加载正文页面失败' }
     }
     
@@ -373,10 +406,12 @@ export async function getContent(
     
     // 检查必要规则
     if (!rule.content?.items) {
+      logger.warn('未配置正文内容规则 (content.items)')
       return { success: false, error: '未配置正文内容规则' }
     }
     
     onProgress?.('正在解析内容...')
+    logger.info(`使用规则: ${rule.content.items.substring(0, 50)}...`)
     
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
@@ -394,8 +429,11 @@ export async function getContent(
     }
     
     if (!result.success) {
+      logger.error(`解析失败: ${result.error}`)
       return { success: false, error: `解析失败: ${result.error}` }
     }
+    
+    logger.result(true, `获取 ${result.data?.length || 0} 项内容`)
     
     return { 
       success: true, 
@@ -405,6 +443,7 @@ export async function getContent(
     
   } finally {
     controller.dispose()
+    logger.clearContext()
   }
 }
 
@@ -454,6 +493,10 @@ export async function getDiscover(
 ): Promise<RuleResult<SearchItem[]> & { nextUrl?: string }> {
   const controller = new WebViewController()
   
+  // 设置日志上下文
+  logger.setContext({ page: '发现页', rule: rule.name, action: '发现' })
+  logger.info(`开始加载发现页 (第 ${page} 页)`)
+  
   try {
     // 替换页码变量
     let processedUrl = discoverUrl
@@ -462,6 +505,7 @@ export async function getDiscover(
     
     // 构建发现页 URL
     const fullUrl = buildFullUrl(processedUrl, rule.host)
+    logger.request(fullUrl)
     
     // 设置 User-Agent（使用规则配置或默认桌面端 UA）
     await controller.setCustomUserAgent(rule.userAgent || DEFAULT_DESKTOP_USER_AGENT)
@@ -469,6 +513,7 @@ export async function getDiscover(
     // 加载页面
     const loadSuccess = await controller.loadURL(fullUrl)
     if (!loadSuccess) {
+      logger.error('加载发现页面失败')
       return { success: false, error: '加载发现页面失败' }
     }
     
@@ -478,8 +523,11 @@ export async function getDiscover(
     
     // 检查必要规则
     if (!rule.discover?.list) {
+      logger.warn('未配置发现列表规则 (discover.list)')
       return { success: false, error: '未配置发现列表规则 (discover.list)' }
     }
+    
+    logger.info(`使用选择器: ${rule.discover.list}`)
     
     // 使用 WebAnalyzer 提取数据（复用搜索结果提取逻辑）
     const analyzer = new WebAnalyzer(controller)
@@ -508,6 +556,7 @@ export async function getDiscover(
     }
     
     if (!result.success) {
+      logger.error(`解析失败: ${result.error}`)
       const htmlPreview = await analyzer.getHtmlPreview(10000)
       return { 
         success: false, 
@@ -517,6 +566,7 @@ export async function getDiscover(
     }
     
     if (!result.data || result.data.length === 0) {
+      logger.warn(`未找到内容，节点数: ${result.debug?.nodeCount || 0}`)
       const htmlPreview = await analyzer.getHtmlPreview(10000)
       return { 
         success: false, 
@@ -524,6 +574,8 @@ export async function getDiscover(
         debug: result.debug
       }
     }
+    
+    logger.result(true, `找到 ${result.data.length} 项内容`)
     
     return { 
       success: true, 
@@ -534,5 +586,6 @@ export async function getDiscover(
     
   } finally {
     controller.dispose()
+    logger.clearContext()
   }
 }

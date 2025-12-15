@@ -18,7 +18,7 @@ import {
   Image,
   GeometryReader
 } from 'scripting'
-import type { Rule, ChapterItem, ContentType } from '../types'
+import type { Rule, ChapterItem } from '../types'
 import { getContent } from '../services/ruleEngine'
 import { ErrorSection, DebugSection, LoadingSection } from '../components/CommonSections'
 

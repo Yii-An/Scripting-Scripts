@@ -892,6 +892,7 @@ declare global {
     /**
      * Display an Alert UI.
      */
+    function alert(message: string): Promise<void>
     function alert(options: {
       /** The message of the alert. */
       message: string
@@ -903,6 +904,7 @@ declare global {
     /**
      * Display an Confirm modal, return a promise that will resolve a boolean value that indicate whether the user confirm or not.
      */
+    function confirm(message: string): Promise<boolean>
     function confirm(options: {
       /**
        * The message of the confirm.
@@ -924,6 +926,7 @@ declare global {
     /**
      * Display a Prompt UI. Returns string result or null.
      */
+    function prompt(message: string): Promise<string | null>
     function prompt(options: {
       /** You need to provide a title to describe the purpose */
       title: string
@@ -996,33 +999,92 @@ declare global {
      *
      * If the key was already in the storage, its associated value is changed.
      */
-    function set(key: string, value: string, options?: KeychainOptions): void
+    function set(key: string, value: string, options?: {
+      /**
+       * A key with a value that indicates when the keychain item is accessible. Defaults to 'unlocked'.
+       */
+      accessibility?: KeychainAccessibility
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
+
+    function setBool(key: string, value: boolean, options?: {
+      /**
+       * A key with a value that indicates when the keychain item is accessible. Defaults to 'unlocked'.
+       */
+      accessibility?: KeychainAccessibility
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
+    function setData(key: string, value: Data, options?: {
+      /**
+       * A key with a value that indicates when the keychain item is accessible. Defaults to 'unlocked'.
+       */
+      accessibility?: KeychainAccessibility
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
     /**
      * Decrypts and returns the value for the given `key` or `null` if `key` is not in the storage.
      */
-    function get(key: string, options?: KeychainOptions): string | null
+    function get(key: string, options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): string | null
+    function getBool(key: string, options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean | null
+    function getData(key: string, options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): Data | null
     /**
      * Deletes associated value for the given `key`.
      *
      * If the given `key` does not exist, nothing will happen.
      */
-    function remove(key: string, options?: KeychainOptions): void
+    function remove(key: string, options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
     /**
      * Returns true if the storage contains the given `key`.
      */
-    function contains(key: string, options?: KeychainOptions): boolean
+    function contains(key: string, options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
+    function keys(options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): string[]
+    function clear(options?: {
+      /**
+       * A key with a boolean value that indicates whether the item synchronizes through iCloud. Defaults to false.
+       */
+      synchronizable?: boolean
+    }): boolean
   }
-
-  type KeychainOptions = {
-    /**
-     * A key with a value that indicates when the keychain item is accessible.
-     */
-    accessibility?: KeychainAccessibility
-    /**
-     * A key with a boolean value that indicates whether the item synchronizes through iCloud.
-     */
-    synchronizable?: boolean
-  }
+  
   /**
   *  - `passcode`: The data in the keychain can only be accessed when the device is unlocked. Only available if a passcode is set on the device. Items with this attribute do not migrate to a new device.
   *  - `unlocked`: The data in the keychain item can be accessed only while the device is unlocked by the user.
@@ -10203,6 +10265,46 @@ If the length of the value parameter exceeds the length of the `maximumUpdateVal
      */
     static identity(): UIGlass
   }
+
+  // /**
+  //  * A class that defines the configuration of the navigation path.
+  //  */
+  // class NavigationPath {
+
+  //   /**
+  //    * The number of elements in this path.
+  //    */
+  //   readonly count: number
+
+  //   /**
+  //    * A Boolean that indicates whether this path is empty.
+  //    */
+  //   readonly isEmpty: boolean
+
+  //   /**
+  //    * Appends a new codable value to the end of this path.
+  //    */
+  //   append(path: string): void
+
+  //   /**
+  //    * Removes values from the end of this path.
+  //    * @param count The number of values to remove. The default value is 1.
+  //    */
+  //   removeLast(count?: number): void
+
+  //   /**
+  //    * Convert the NavigationPath to data. You can use this to save the path to a file or the Storage.
+  //    * @returns The data or null if the NavigationPath fails to convert to data.
+  //    */
+  //   toData(): Data | null
+
+  //   /**
+  //    * Create a NavigationPath from data.
+  //    * @param data The data to create the NavigationPath from, use the `toData` method to create the data.
+  //    * @returns The NavigationPath or null if the data is invalid.
+  //    */
+  //   static fromData(data: Data): NavigationPath | null
+  // }
 }
 
 export { }

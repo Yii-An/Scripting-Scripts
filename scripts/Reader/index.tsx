@@ -1,5 +1,5 @@
 /**
- * Any-Reader 阅读器入口
+ * Reader 阅读器入口
  */
 
 import { Navigation } from 'scripting'

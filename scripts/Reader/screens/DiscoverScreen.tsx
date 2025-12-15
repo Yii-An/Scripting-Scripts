@@ -141,7 +141,7 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
       
       // 如果是错误对象
       if (parsed && typeof parsed === 'object' && parsed.error) {
-        console.log('JS 执行错误:', parsed.error)
+        // JS 执行错误，静默处理
         return []
       }
       

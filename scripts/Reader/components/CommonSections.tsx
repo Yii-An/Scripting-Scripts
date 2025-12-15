@@ -7,7 +7,8 @@ import {
   Button,
   Section,
   Text,
-  VStack
+  VStack,
+  useEffect
 } from 'scripting'
 
 type ErrorSectionProps = {
@@ -19,7 +20,7 @@ type ErrorSectionProps = {
  * 错误信息显示组件
  */
 export function ErrorSection({ error, onRetry }: ErrorSectionProps) {
-  if (!error) return null
+  if (!error) return <VStack frame={{ height: 0 }} />
   
   return (
     <Section header={<Text>错误信息</Text>}>
@@ -38,23 +39,19 @@ type DebugSectionProps = {
 }
 
 /**
- * 调试信息显示组件
+ * 调试信息组件 - 输出到 console
+ * 不再在 UI 中展示，改为 console.log 输出
  */
 export function DebugSection({ debugInfo, title = '调试信息', show = true }: DebugSectionProps) {
-  if (!debugInfo || !show) return null
+  // 使用 useEffect 输出日志，避免重复输出
+  useEffect(() => {
+    if (debugInfo && show) {
+      console.log(`[${title}]`, debugInfo)
+    }
+  }, [debugInfo, title, show])
   
-  return (
-    <Section header={<Text>{title}</Text>}>
-      <Text font="caption" foregroundStyle="secondaryLabel">{debugInfo}</Text>
-      <Button 
-        title="复制调试信息" 
-        action={async () => {
-          await Pasteboard.setString(debugInfo)
-          await Dialog.alert({ title: '已复制', message: '调试信息已复制到剪贴板' })
-        }} 
-      />
-    </Section>
-  )
+  // 返回空的 VStack 而不是 null
+  return <VStack frame={{ height: 0 }} />
 }
 
 type LoadingSectionProps = {
@@ -67,7 +64,7 @@ type LoadingSectionProps = {
  */
 export function LoadingSection({ loading, message = '加载中...' }: LoadingSectionProps) {
   // 只有在 loading 严格为 true 时才显示
-  if (loading !== true) return null
+  if (loading !== true) return <VStack frame={{ height: 0 }} />
   
   return (
     <Section>
