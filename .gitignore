@@ -25,3 +25,5 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 /demo/
+/tmp
+.kilocode/*
