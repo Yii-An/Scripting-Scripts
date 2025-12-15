@@ -37,7 +37,7 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
   
   // 初始调试信息
   const getBaseDebug = () => 
-    `请求 URL: ${item.url}\nchapterUrl: ${rule.chapterUrl || '(未配置)'}\nchapterList: ${rule.chapterList || '(未配置)'}\nchapterName: ${rule.chapterName || '(未配置)'}\nchapterResult: ${rule.chapterResult || '(未配置)'}`
+    `请求 URL: ${item.url}\nchapter.url: ${rule.chapter?.url || '(未配置)'}\nchapter.list: ${rule.chapter?.list || '(未配置)'}\nchapter.name: ${rule.chapter?.name || '(未配置)'}\nchapter.result: ${rule.chapter?.result || '(未配置)'}`
   
   const [debugInfo, setDebugInfo] = useState(() => 
     getBaseDebug() + '\n\n加载中...'

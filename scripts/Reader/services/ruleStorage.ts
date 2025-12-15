@@ -4,6 +4,7 @@
  */
 
 import type { Rule, RuleResult } from '../types'
+import { UniversalContentType } from '../types'
 
 const RULES_FILE_NAME = 'any-reader-rules.json'
 
@@ -100,6 +101,17 @@ export async function deleteRule(ruleId: string): Promise<RuleResult<void>> {
 }
 
 /**
+ * 清空所有规则
+ */
+export async function clearAllRules(): Promise<RuleResult<void>> {
+  try {
+    return await saveRules([])
+  } catch (error: any) {
+    return { success: false, error: error.message || '清空规则失败' }
+  }
+}
+
+/**
  * 根据 ID 获取规则
  */
 export async function getRule(ruleId: string): Promise<RuleResult<Rule | null>> {
@@ -132,7 +144,7 @@ export function parseRuleJson(json: string): RuleResult<Rule> {
     
     // 设置默认值
     if (rule.contentType === undefined) {
-      rule.contentType = 1 // 默认小说
+      rule.contentType = UniversalContentType.NOVEL // 默认小说
     }
     
     return { success: true, data: rule }

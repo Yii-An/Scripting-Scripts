@@ -96,14 +96,29 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
     
     let jsCode = trimmed.slice(4).trim()
     
-    // 将最后一行包装成 return 语句
-    const jsLines = jsCode.split('\n')
-    const lastLine = jsLines[jsLines.length - 1].trim()
-    if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
-      const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
-      jsLines[jsLines.length - 1] = `return ${cleanLastLine};`
+    // 检查是否是 IIFE 表达式 (立即执行函数)
+    // 格式: (() => { ... })() 或 (function() { ... })()
+    const isIIFE = /^\s*\([\s\S]*\)\s*\(\s*\)\s*;?\s*$/.test(jsCode)
+    
+    let wrappedCode: string
+    if (isIIFE) {
+      // IIFE 表达式：整体包装成 return JSON.stringify(...)
+      const cleanCode = jsCode.replace(/;?\s*$/, '') // 移除末尾分号
+      wrappedCode = `return JSON.stringify(${cleanCode});`
+    } else {
+      // 普通代码：将最后一行包装成 return 语句
+      const jsLines = jsCode.split('\n')
+      const lastLine = jsLines[jsLines.length - 1].trim()
+      
+      if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
+        const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
+        jsLines[jsLines.length - 1] = `return JSON.stringify(${cleanLastLine});`
+      } else if (lastLine.startsWith('return ') && !lastLine.includes('JSON.stringify')) {
+        const returnContent = lastLine.slice(7).replace(/;$/, '')
+        jsLines[jsLines.length - 1] = `return JSON.stringify(${returnContent});`
+      }
+      wrappedCode = jsLines.join('\n')
     }
-    const wrappedCode = jsLines.join('\n')
     
     // 执行 JavaScript
     const script = `
@@ -114,29 +129,33 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
       }
     `
     
-    const result = await controller.evaluateJavaScript<string | string[]>(script)
+    const result = await controller.evaluateJavaScript<string>(script)
     
     if (!result) {
       return []
     }
     
-    // 如果返回的是数组，解析为分类
-    if (Array.isArray(result)) {
-      return parseDiscoverUrlSync(result.join('\n'))
-    }
-    
-    // 如果返回的是字符串
-    if (typeof result === 'string') {
-      // 检查是否是错误
-      if (result.startsWith('{') && result.includes('error')) {
-        try {
-          const parsed = JSON.parse(result)
-          if (parsed.error) {
-            console.log('JS 执行错误:', parsed.error)
-            return []
-          }
-        } catch {}
+    // 尝试解析 JSON
+    try {
+      const parsed = JSON.parse(result)
+      
+      // 如果是错误对象
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        console.log('JS 执行错误:', parsed.error)
+        return []
       }
+      
+      // 如果是数组，解析为分类
+      if (Array.isArray(parsed)) {
+        return parseDiscoverUrlSync(parsed.join('\n'))
+      }
+      
+      // 如果是字符串，直接解析
+      if (typeof parsed === 'string') {
+        return parseDiscoverUrlSync(parsed)
+      }
+    } catch {
+      // JSON 解析失败，当作普通字符串处理
       return parseDiscoverUrlSync(result)
     }
     
@@ -185,7 +204,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
     }
     setError(null)
     
-    appendDebug(`开始加载第 ${pageNum} 页\nURL: ${url}\n规则: discoverList=${rule.discoverList || '未配置'}`)
+    appendDebug(`开始加载第 ${pageNum} 页\nURL: ${url}\n规则: discover.list=${rule.discover?.list || '未配置'}`)
     
     const result = await getDiscover(rule, url, pageNum)
     
@@ -213,12 +232,12 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
     if (initRef.current) return
     initRef.current = true
     
-    if (!rule.discoverUrl) return
+    if (!rule.discover?.url) return
     
     // 异步解析分类并加载
     const init = async () => {
       try {
-        const parsed = await parseDiscoverUrl(rule.discoverUrl!)
+        const parsed = await parseDiscoverUrl(rule.discover?.url || '')
         setCategories(parsed)
         if (parsed.length > 0) {
           const firstUrl = parsed[0].pairs[0].value
@@ -258,7 +277,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
     }
   }
 
-  if (!rule.enableDiscover || !rule.discoverUrl) {
+  if (!rule.discover?.enabled || !rule.discover?.url) {
     return (
       <Form navigationTitle="发现">
         <Section>

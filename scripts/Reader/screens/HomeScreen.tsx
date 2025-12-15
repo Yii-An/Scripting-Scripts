@@ -38,6 +38,7 @@ const BOOKSHELF_KEY = 'any-reader-bookshelf'
  */
 async function loadBookshelf(): Promise<BookshelfItem[]> {
   try {
+    console.log('加载书架')
     const data = await Keychain.get(BOOKSHELF_KEY)
     if (data) {
       return JSON.parse(data)

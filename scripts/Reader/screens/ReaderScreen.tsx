@@ -18,8 +18,7 @@ import {
   Image,
   GeometryReader
 } from 'scripting'
-import type { Rule, ChapterItem } from '../types'
-import { ContentType } from '../types'
+import type { Rule, ChapterItem, ContentType } from '../types'
 import { getContent } from '../services/ruleEngine'
 import { ErrorSection, DebugSection, LoadingSection } from '../components/CommonSections'
 
@@ -48,7 +47,7 @@ export function ReaderScreen({
   
   // 初始调试信息
   const getBaseDebug = (url: string) => 
-    `请求 URL: ${url}\ncontentUrl: ${rule.contentUrl || '(未配置)'}\ncontentItems: ${rule.contentItems || '(未配置)'}`
+    `请求 URL: ${url}\ncontent.url: ${rule.content?.url || '(未配置)'}\ncontent.items: ${rule.content?.items || '(未配置)'}`
   
   const [debugInfo, setDebugInfo] = useState(() => 
     getBaseDebug(chapters[currentIndex].url) + '\n\n加载中...'
@@ -110,7 +109,7 @@ export function ReaderScreen({
   }
 
   // 判断是否为漫画类型
-  const isManga = rule.contentType === ContentType.MANGA
+  const isManga = rule.contentType === 'manga'
 
   // 底部栏高度
   const bottomBarHeight = 60
@@ -144,14 +143,15 @@ export function ReaderScreen({
                     // 如果是漫画，显示图片
                     if (isManga) {
                       return (
-                        <VStack key={index} alignment="center">
+                        <VStack key={index} alignment="center" frame={{ width: geometry.size.width }}>
                           <Image
                             imageUrl={item}
                             resizable
+                            scaleToFit
                             frame={{ width: geometry.size.width }}
                             placeholder={
                               <VStack
-                                frame={{ width: geometry.size.width, height: 400 }}
+                                frame={{ width: geometry.size.width, height: 300 }}
                                 background="secondarySystemFill"
                                 alignment="center"
                               >

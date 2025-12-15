@@ -13,6 +13,12 @@ import type {
 import { WebAnalyzer, buildFullUrl } from './webAnalyzer'
 
 /**
+ * 默认桌面端 User-Agent
+ * 使用桌面 UA 确保网站返回电脑端页面结构，避免移动端/电脑端 CSS 类名不一致问题
+ */
+const DEFAULT_DESKTOP_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+/**
  * 进度回调类型
  */
 type ProgressCallback = (message: string) => void
@@ -21,16 +27,17 @@ type ProgressCallback = (message: string) => void
  * 格式化搜索相关规则信息（用于调试）
  */
 function formatSearchRules(rule: Rule): string {
+  const s = rule.search
   return [
     `【搜索规则配置】`,
-    `searchUrl: ${rule.searchUrl || '(未配置)'}`,
-    `searchList: ${rule.searchList || '(未配置)'}`,
-    `searchName: ${rule.searchName || '(未配置, 默认: @text)'}`,
-    `searchCover: ${rule.searchCover || '(未配置)'}`,
-    `searchAuthor: ${rule.searchAuthor || '(未配置)'}`,
-    `searchChapter: ${rule.searchChapter || '(未配置)'}`,
-    `searchDescription: ${rule.searchDescription || '(未配置)'}`,
-    `searchResult: ${rule.searchResult || '(未配置, 默认: a@href)'}`
+    `search.url: ${s?.url || '(未配置)'}`,
+    `search.list: ${s?.list || '(未配置)'}`,
+    `search.name: ${s?.name || '(未配置, 默认: @text)'}`,
+    `search.cover: ${s?.cover || '(未配置)'}`,
+    `search.author: ${s?.author || '(未配置)'}`,
+    `search.latestChapter: ${s?.latestChapter || '(未配置)'}`,
+    `search.description: ${s?.description || '(未配置)'}`,
+    `search.result: ${s?.result || '(未配置, 默认: a@href)'}`
   ].join('\n')
 }
 
@@ -38,15 +45,16 @@ function formatSearchRules(rule: Rule): string {
  * 格式化章节列表相关规则信息（用于调试）
  */
 function formatChapterRules(rule: Rule): string {
+  const c = rule.chapter
   return [
     `【章节列表规则配置】`,
-    `chapterUrl: ${rule.chapterUrl || '(未配置)'}`,
-    `chapterList: ${rule.chapterList || '(未配置)'}`,
-    `chapterName: ${rule.chapterName || '(未配置, 默认: @text)'}`,
-    `chapterCover: ${rule.chapterCover || '(未配置)'}`,
-    `chapterTime: ${rule.chapterTime || '(未配置)'}`,
-    `chapterResult: ${rule.chapterResult || '(未配置, 默认: a@href)'}`,
-    `chapterNextUrl: ${rule.chapterNextUrl || '(未配置)'}`
+    `chapter.url: ${c?.url || '(未配置)'}`,
+    `chapter.list: ${c?.list || '(未配置)'}`,
+    `chapter.name: ${c?.name || '(未配置, 默认: @text)'}`,
+    `chapter.cover: ${c?.cover || '(未配置)'}`,
+    `chapter.time: ${c?.time || '(未配置)'}`,
+    `chapter.result: ${c?.result || '(未配置, 默认: a@href)'}`,
+    `chapter.nextUrl: ${c?.nextUrl || '(未配置)'}`
   ].join('\n')
 }
 
@@ -54,12 +62,13 @@ function formatChapterRules(rule: Rule): string {
  * 格式化正文内容相关规则信息（用于调试）
  */
 function formatContentRules(rule: Rule): string {
+  const ct = rule.content
   return [
     `【正文内容规则配置】`,
-    `contentUrl: ${rule.contentUrl || '(未配置)'}`,
-    `contentItems: ${rule.contentItems || '(未配置)'}`,
-    `contentNextUrl: ${rule.contentNextUrl || '(未配置)'}`,
-    `contentDecoder: ${rule.contentDecoder || '(未配置)'}`
+    `content.url: ${ct?.url || '(未配置)'}`,
+    `content.items: ${ct?.items || '(未配置)'}`,
+    `content.nextUrl: ${ct?.nextUrl || '(未配置)'}`,
+    `content.decoder: ${ct?.decoder || '(未配置)'}`
   ].join('\n')
 }
 
@@ -157,12 +166,12 @@ export async function search(
     // 输出规则配置信息
     onProgress?.(`【搜索页面】\n接收参数: keyword=${keyword}\n\n${formatSearchRules(rule)}`)
     
-    if (!rule.enableSearch || !rule.searchUrl) {
+    if (!rule.search?.enabled || !rule.search?.url) {
       return { success: false, error: '规则未启用搜索功能' }
     }
     
     // 构建搜索 URL（不编码，让 WebView 处理）
-    let searchUrl = rule.searchUrl
+    let searchUrl = rule.search.url!
       .replace(/\$keyword\b/g, keyword)
       .replace(/\{\{keyword\}\}/g, keyword)
       .replace(/\$page\b/g, '1')
@@ -172,10 +181,8 @@ export async function search(
     
     onProgress?.(`正在搜索: ${searchUrl}`)
     
-    // 设置 User-Agent
-    if (rule.userAgent) {
-      await controller.setCustomUserAgent(rule.userAgent)
-    }
+    // 设置 User-Agent（使用规则配置或默认桌面端 UA）
+    await controller.setCustomUserAgent(rule.userAgent || DEFAULT_DESKTOP_USER_AGENT)
     
     // 加载页面
     onProgress?.('正在加载页面...')
@@ -194,7 +201,7 @@ export async function search(
     await waitForContent(controller, onProgress)
     
     // 检查必要规则
-    if (!rule.searchList) {
+    if (!rule.search?.list) {
       return { success: false, error: '未配置搜索列表规则' }
     }
     
@@ -203,13 +210,13 @@ export async function search(
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
     const result = await analyzer.extractSearchResults({
-      listSelector: rule.searchList,
-      nameRule: rule.searchName || '@text',
-      coverRule: rule.searchCover || '',
-      authorRule: rule.searchAuthor || '',
-      chapterRule: rule.searchChapter || '',
-      descriptionRule: rule.searchDescription || '',
-      urlRule: rule.searchResult || 'a@href',
+      listSelector: rule.search.list!,
+      nameRule: rule.search.name || '@text',
+      coverRule: rule.search.cover || '',
+      authorRule: rule.search.author || '',
+      chapterRule: rule.search.latestChapter || '',
+      descriptionRule: rule.search.description || '',
+      urlRule: rule.search.result || 'a@href',
       host: rule.host
     })
     
@@ -264,21 +271,19 @@ export async function getChapterList(
     }
     
     // 构建章节页 URL
-    const chapterUrl = rule.chapterUrl 
-      ? buildFullUrl(rule.chapterUrl.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
+    const chapterPageUrl = rule.chapter?.url 
+      ? buildFullUrl(rule.chapter.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
       : buildFullUrl(url, rule.host)
     
-    onProgress?.(`正在加载页面: ${chapterUrl}`)
+    onProgress?.(`正在加载页面: ${chapterPageUrl}`)
     
-    // 设置 User-Agent
-    if (rule.userAgent) {
-      await controller.setCustomUserAgent(rule.userAgent)
-    }
+    // 设置 User-Agent（使用规则配置或默认桌面端 UA）
+    await controller.setCustomUserAgent(rule.userAgent || DEFAULT_DESKTOP_USER_AGENT)
     
     // 加载页面
-    const loadSuccess = await controller.loadURL(chapterUrl)
+    const loadSuccess = await controller.loadURL(chapterPageUrl)
     if (!loadSuccess) {
-      return { success: false, error: `加载章节页面失败: ${chapterUrl}` }
+      return { success: false, error: `加载章节页面失败: ${chapterPageUrl}` }
     }
     
     await controller.waitForLoad()
@@ -288,7 +293,7 @@ export async function getChapterList(
     await waitForContent(controller, onProgress)
     
     // 检查必要规则
-    if (!rule.chapterList) {
+    if (!rule.chapter?.list) {
       return { success: false, error: '未配置章节列表规则' }
     }
     
@@ -297,18 +302,18 @@ export async function getChapterList(
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
     const result = await analyzer.extractChapterList({
-      listSelector: rule.chapterList,
-      nameRule: rule.chapterName || '@text',
-      urlRule: rule.chapterResult || 'a@href',
-      coverRule: rule.chapterCover,
-      timeRule: rule.chapterTime,
+      listSelector: rule.chapter.list!,
+      nameRule: rule.chapter.name || '@text',
+      urlRule: rule.chapter.result || 'a@href',
+      coverRule: rule.chapter.cover,
+      timeRule: rule.chapter.time,
       host: rule.host
     })
     
     // 提取下一页 URL
     let nextUrl: string | undefined
-    if (rule.chapterNextUrl) {
-      const nextResult = await analyzer.extractSingleValue(rule.chapterNextUrl, rule.host)
+    if (rule.chapter.nextUrl) {
+      const nextResult = await analyzer.extractSingleValue(rule.chapter.nextUrl, rule.host)
       if (nextResult.success && nextResult.data) {
         nextUrl = nextResult.data
       }
@@ -345,19 +350,17 @@ export async function getContent(
     onProgress?.(`【正文内容页面】\n接收参数: url=${url}\n\n${formatContentRules(rule)}`)
     
     // 构建正文 URL
-    const contentUrl = rule.contentUrl 
-      ? buildFullUrl(rule.contentUrl.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
+    const contentPageUrl = rule.content?.url 
+      ? buildFullUrl(rule.content.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
       : buildFullUrl(url, rule.host)
     
-    onProgress?.(`正在加载页面: ${contentUrl}`)
+    onProgress?.(`正在加载页面: ${contentPageUrl}`)
     
-    // 设置 User-Agent
-    if (rule.userAgent) {
-      await controller.setCustomUserAgent(rule.userAgent)
-    }
+    // 设置 User-Agent（使用规则配置或默认桌面端 UA）
+    await controller.setCustomUserAgent(rule.userAgent || DEFAULT_DESKTOP_USER_AGENT)
     
     // 加载页面
-    const loadSuccess = await controller.loadURL(contentUrl)
+    const loadSuccess = await controller.loadURL(contentPageUrl)
     if (!loadSuccess) {
       return { success: false, error: '加载正文页面失败' }
     }
@@ -369,7 +372,7 @@ export async function getContent(
     await waitForContent(controller, onProgress)
     
     // 检查必要规则
-    if (!rule.contentItems) {
+    if (!rule.content?.items) {
       return { success: false, error: '未配置正文内容规则' }
     }
     
@@ -378,13 +381,13 @@ export async function getContent(
     // 使用 WebAnalyzer 提取数据
     const analyzer = new WebAnalyzer(controller)
     const result = await analyzer.extractContent({
-      contentRule: rule.contentItems
+      contentRule: rule.content.items!
     })
     
     // 提取下一页 URL
     let nextUrl: string | undefined
-    if (rule.contentNextUrl) {
-      const nextResult = await analyzer.extractSingleValue(rule.contentNextUrl, rule.host)
+    if (rule.content.nextUrl) {
+      const nextResult = await analyzer.extractSingleValue(rule.content.nextUrl, rule.host)
       if (nextResult.success && nextResult.data) {
         nextUrl = nextResult.data
       }
@@ -460,10 +463,8 @@ export async function getDiscover(
     // 构建发现页 URL
     const fullUrl = buildFullUrl(processedUrl, rule.host)
     
-    // 设置 User-Agent
-    if (rule.userAgent) {
-      await controller.setCustomUserAgent(rule.userAgent)
-    }
+    // 设置 User-Agent（使用规则配置或默认桌面端 UA）
+    await controller.setCustomUserAgent(rule.userAgent || DEFAULT_DESKTOP_USER_AGENT)
     
     // 加载页面
     const loadSuccess = await controller.loadURL(fullUrl)
@@ -476,38 +477,38 @@ export async function getDiscover(
     await waitForContent(controller)
     
     // 检查必要规则
-    if (!rule.discoverList) {
-      return { success: false, error: '未配置发现列表规则 (discoverList)' }
+    if (!rule.discover?.list) {
+      return { success: false, error: '未配置发现列表规则 (discover.list)' }
     }
     
     // 使用 WebAnalyzer 提取数据（复用搜索结果提取逻辑）
     const analyzer = new WebAnalyzer(controller)
     
     // 调试：显示使用的规则
-    const ruleDebug = `URL: ${fullUrl}\ndiscoverList: ${rule.discoverList}\ndiscoverName: ${rule.discoverName || '@text'}\ndiscoverCover: ${rule.discoverCover || ''}\ndiscoverResult: ${rule.discoverResult || 'a@href'}`
+    const ruleDebug = `URL: ${fullUrl}\ndiscover.list: ${rule.discover.list}\ndiscover.name: ${rule.discover.name || '@text'}\ndiscover.cover: ${rule.discover.cover || ''}\ndiscover.result: ${rule.discover.result || 'a@href'}`
     
     const result = await analyzer.extractSearchResults({
-      listSelector: rule.discoverList,
-      nameRule: rule.discoverName || '@text',
-      coverRule: rule.discoverCover || '',
-      authorRule: rule.discoverAuthor || '',
-      chapterRule: rule.discoverChapter || '',
-      descriptionRule: rule.discoverDescription || '',
-      urlRule: rule.discoverResult || 'a@href',
+      listSelector: rule.discover.list!,
+      nameRule: rule.discover.name || '@text',
+      coverRule: rule.discover.cover || '',
+      authorRule: rule.discover.author || '',
+      chapterRule: rule.discover.latestChapter || '',
+      descriptionRule: rule.discover.description || '',
+      urlRule: rule.discover.result || 'a@href',
       host: rule.host
     })
     
     // 提取下一页 URL
     let nextUrl: string | undefined
-    if (rule.discoverNextUrl) {
-      const nextResult = await analyzer.extractSingleValue(rule.discoverNextUrl, rule.host)
+    if (rule.discover.nextUrl) {
+      const nextResult = await analyzer.extractSingleValue(rule.discover.nextUrl, rule.host)
       if (nextResult.success && nextResult.data) {
         nextUrl = nextResult.data
       }
     }
     
     if (!result.success) {
-      const htmlPreview = await analyzer.getHtmlPreview(3000)
+      const htmlPreview = await analyzer.getHtmlPreview(10000)
       return { 
         success: false, 
         error: `解析失败: ${result.error}\n\n规则:\n${ruleDebug}\n\nHTML预览:\n${htmlPreview}`,
@@ -516,7 +517,7 @@ export async function getDiscover(
     }
     
     if (!result.data || result.data.length === 0) {
-      const htmlPreview = await analyzer.getHtmlPreview(3000)
+      const htmlPreview = await analyzer.getHtmlPreview(10000)
       return { 
         success: false, 
         error: `未找到内容\n\n规则:\n${ruleDebug}\n\n节点数: ${result.debug?.nodeCount || 0}\n\nHTML预览:\n${htmlPreview}`,

@@ -19,10 +19,11 @@ import {
   NavigationLink
 } from 'scripting'
 import type { Rule } from '../types'
-import { ContentType } from '../types'
+import { UniversalContentType, UniversalContentTypeLabels } from '../types'
 import {
   loadRules,
   deleteRule,
+  clearAllRules,
   parseRuleJson,
   addRule,
   importRules,
@@ -34,15 +35,8 @@ import { DiscoverScreen } from './DiscoverScreen'
 /**
  * 获取内容类型标签
  */
-function getContentTypeLabel(type: ContentType): string {
-  switch (type) {
-    case ContentType.MANGA: return '漫画'
-    case ContentType.NOVEL: return '小说'
-    case ContentType.VIDEO: return '视频'
-    case ContentType.AUDIO: return '音频'
-    case ContentType.RSS: return 'RSS'
-    default: return '未知'
-  }
+function getContentTypeLabel(type: UniversalContentType): string {
+  return UniversalContentTypeLabels[type] || '未知'
 }
 
 /**
@@ -74,7 +68,7 @@ function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Prom
 
       {/* 功能入口 */}
       <Section header={<Text>功能</Text>}>
-        {rule.enableSearch ? (
+        {rule.search?.enabled ? (
           <NavigationLink destination={<SearchScreen rule={rule} />}>
             <HStack>
               <Text>🔍 搜索</Text>
@@ -87,7 +81,7 @@ function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Prom
           </HStack>
         )}
         
-        {rule.enableDiscover ? (
+        {rule.discover?.enabled ? (
           <NavigationLink destination={<DiscoverScreen rule={rule} />}>
             <HStack>
               <Text>📚 发现</Text>
@@ -225,6 +219,28 @@ export function RuleListScreen() {
     }
   }
 
+  // 清空所有书源
+  const handleClearAll = async () => {
+    if (rules.length === 0) {
+      await Dialog.alert({ title: '提示', message: '当前没有书源可清空' })
+      return
+    }
+
+    const confirm = await Dialog.confirm({
+      title: '确认清空',
+      message: `确定要删除全部 ${rules.length} 个书源吗？此操作不可撤销！`
+    })
+    if (confirm) {
+      const result = await clearAllRules()
+      if (result.success) {
+        fetchRules()
+        await Dialog.alert({ title: '成功', message: '已清空所有书源' })
+      } else {
+        await Dialog.alert({ title: '错误', message: result.error || '清空失败' })
+      }
+    }
+  }
+
   return (
     <NavigationStack>
       <Form
@@ -255,6 +271,14 @@ export function RuleListScreen() {
               title="刷新"
               action={fetchRules}
               disabled={loading}
+            />
+          </HStack>
+          <HStack>
+            <Button
+              title="清空全部书源"
+              action={handleClearAll}
+              foregroundStyle="red"
+              disabled={loading || rules.length === 0}
             />
           </HStack>
         </Section>

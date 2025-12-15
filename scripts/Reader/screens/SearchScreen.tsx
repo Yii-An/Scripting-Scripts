@@ -48,7 +48,7 @@ export function SearchScreen({ rule }: SearchScreenProps) {
     setError(null)
     setSearched(true)
     
-    const baseDebug = `关键词: ${keyword.trim()}\nsearchUrl: ${rule.searchUrl || '(未配置)'}\nsearchList: ${rule.searchList || '(未配置)'}`
+    const baseDebug = `关键词: ${keyword.trim()}\nsearch.url: ${rule.search?.url || '(未配置)'}\nsearch.list: ${rule.search?.list || '(未配置)'}`
     setDebugInfo(baseDebug + '\n\n搜索中...')
 
     // 进度回调：实时更新调试信息
