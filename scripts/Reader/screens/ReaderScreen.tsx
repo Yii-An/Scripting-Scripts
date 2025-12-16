@@ -20,12 +20,15 @@ import {
 } from 'scripting'
 import type { Rule, ChapterItem } from '../types'
 import { getContent } from '../services/ruleEngine'
-import { ErrorSection, DebugSection, LoadingSection } from '../components/CommonSections'
+import { LoadingSection } from '../components/CommonSections'
+import { logger } from '../services/logger'
+import { updateReadProgress, isInBookshelf } from '../services/bookshelfStorage'
 
 type ReaderScreenProps = {
   rule: Rule
   chapter: ChapterItem
   bookName: string
+  bookUrl: string        // 书籍 URL（用于更新阅读进度）
   chapters: ChapterItem[]
   currentIndex: number
 }
@@ -37,6 +40,7 @@ export function ReaderScreen({
   rule, 
   chapter, 
   bookName, 
+  bookUrl,
   chapters, 
   currentIndex 
 }: ReaderScreenProps) {
@@ -45,13 +49,7 @@ export function ReaderScreen({
   const [error, setError] = useState<string | null>(null)
   const [chapterIndex, setChapterIndex] = useState(currentIndex)
   
-  // 初始调试信息
-  const getBaseDebug = (url: string) => 
-    `请求 URL: ${url}\ncontent.url: ${rule.content?.url || '(未配置)'}\ncontent.items: ${rule.content?.items || '(未配置)'}`
-  
-  const [debugInfo, setDebugInfo] = useState(() => 
-    getBaseDebug(chapters[currentIndex].url) + '\n\n加载中...'
-  )
+
 
   const currentChapter = chapters[chapterIndex]
   const hasPrev = chapterIndex > 0
@@ -63,12 +61,17 @@ export function ReaderScreen({
     setError(null)
     setContent([])
     
-    const baseDebug = getBaseDebug(chapterUrl)
-    setDebugInfo(baseDebug + '\n\n加载中...')
+    // 设置日志上下文
+    logger.setContext({ page: '阅读页', rule: rule.name, action: '加载正文' })
+    logger.info(`开始加载正文`, { 
+      chapterUrl, 
+      contentUrl: rule.content?.url,
+      contentItems: rule.content?.items
+    })
 
-    // 进度回调：实时更新调试信息
+    // 进度回调：实时记录日志
     const onProgress = (message: string) => {
-      setDebugInfo(baseDebug + `\n\n状态: ${message}`)
+      logger.debug(`进度: ${message}`)
     }
 
     const result = await getContent(rule, chapterUrl, onProgress)
@@ -76,15 +79,15 @@ export function ReaderScreen({
     if (result.success) {
       setContent(result.data || [])
       if ((result.data || []).length === 0) {
-        setDebugInfo(baseDebug + '\n\n结果: 加载成功但无内容')
+        logger.warn(`加载成功但无内容`, { chapterUrl })
       } else {
         const firstItem = result.data?.[0] || ''
         const preview = firstItem.length > 100 ? firstItem.substring(0, 100) + '...' : firstItem
-        setDebugInfo(baseDebug + `\n\n结果: 找到 ${result.data?.length} 项内容\n第一项: ${preview}`)
+        logger.result(true, `找到 ${result.data?.length} 项内容`, { preview })
       }
     } else {
       setError(result.error || '加载失败')
-      setDebugInfo(baseDebug + `\n\n错误: ${result.error}`)
+      logger.result(false, result.error || '加载失败', { chapterUrl })
     }
     
     setLoading(false)
@@ -93,6 +96,22 @@ export function ReaderScreen({
   useEffect(() => {
     fetchContent(currentChapter.url)
   }, [chapterIndex])
+
+  // 更新阅读进度（当内容加载成功时）
+  useEffect(() => {
+    if (content.length > 0 && !loading) {
+      isInBookshelf(bookUrl).then(inShelf => {
+        if (inShelf) {
+          updateReadProgress(
+            bookUrl, 
+            currentChapter.name, 
+            chapterIndex, 
+            currentChapter.url
+          )
+        }
+      })
+    }
+  }, [content, loading, chapterIndex])
 
   // 上一章
   const handlePrev = () => {
@@ -130,8 +149,7 @@ export function ReaderScreen({
                 </Text>
               </VStack>
 
-              {/* 调试信息（包含错误信息） */}
-              <DebugSection debugInfo={debugInfo} />
+
 
               {/* 加载状态 */}
               {loading ? <LoadingSection loading={loading} /> : null}

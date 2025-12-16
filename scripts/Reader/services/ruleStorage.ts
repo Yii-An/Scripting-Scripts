@@ -5,8 +5,9 @@
 
 import type { Rule, RuleResult } from '../types'
 import { UniversalContentType } from '../types'
+import { logger } from './logger'
 
-const RULES_FILE_NAME = 'any-reader-rules.json'
+const RULES_FILE_NAME = 'reader/rules.json'
 
 /**
  * 获取规则存储路径
@@ -46,11 +47,19 @@ export async function loadRules(): Promise<RuleResult<Rule[]>> {
 export async function saveRules(rules: Rule[]): Promise<RuleResult<void>> {
   try {
     const filePath = getRulesFilePath()
+    // 确保父目录存在
+    const dir = `${FileManager.documentsDirectory}/reader`
+    const dirExists = await FileManager.exists(dir)
+    if (!dirExists) {
+      logger.info(`创建规则存储目录: ${dir}`)
+      await FileManager.createDirectory(dir)
+    }
     const content = JSON.stringify(rules, null, 2)
-    
     await FileManager.writeAsString(filePath, content)
+    logger.debug(`规则已保存，共 ${rules.length} 条`)
     return { success: true }
   } catch (error: any) {
+    logger.error(`保存规则失败: ${error.message}`)
     return { success: false, error: error.message || '保存规则失败' }
   }
 }
@@ -60,6 +69,7 @@ export async function saveRules(rules: Rule[]): Promise<RuleResult<void>> {
  */
 export async function addRule(rule: Rule): Promise<RuleResult<void>> {
   try {
+    logger.info(`正在添加规则: ${rule.name} (${rule.id})`)
     const result = await loadRules()
     if (!result.success) {
       return { success: false, error: result.error }
@@ -71,12 +81,15 @@ export async function addRule(rule: Rule): Promise<RuleResult<void>> {
     const existingIndex = rules.findIndex(r => r.id === rule.id)
     if (existingIndex >= 0) {
       rules[existingIndex] = rule
+      logger.info(`规则已更新: ${rule.name}`)
     } else {
       rules.push(rule)
+      logger.info(`规则已添加: ${rule.name}`)
     }
     
     return await saveRules(rules)
   } catch (error: any) {
+    logger.error(`添加规则失败: ${error.message}`)
     return { success: false, error: error.message || '添加规则失败' }
   }
 }
@@ -86,6 +99,7 @@ export async function addRule(rule: Rule): Promise<RuleResult<void>> {
  */
 export async function deleteRule(ruleId: string): Promise<RuleResult<void>> {
   try {
+    logger.info(`正在删除规则: ${ruleId}`)
     const result = await loadRules()
     if (!result.success) {
       return { success: false, error: result.error }
@@ -94,8 +108,13 @@ export async function deleteRule(ruleId: string): Promise<RuleResult<void>> {
     const rules = result.data || []
     const filteredRules = rules.filter(r => r.id !== ruleId)
     
+    if (filteredRules.length < rules.length) {
+      logger.info(`规则已删除`)
+    }
+    
     return await saveRules(filteredRules)
   } catch (error: any) {
+    logger.error(`删除规则失败: ${error.message}`)
     return { success: false, error: error.message || '删除规则失败' }
   }
 }
@@ -262,15 +281,22 @@ export async function updateRulesFromUrl(url: string): Promise<RuleResult<{ adde
  */
 export async function importRules(json: string): Promise<RuleResult<number>> {
   try {
+    logger.info(`开始导入规则，JSON 长度: ${json.length}`)
+    logger.debug(`导入内容预览: ${json.substring(0, 200)}...`)
+    
     const parsed = JSON.parse(json)
+    logger.debug(`JSON 解析成功，类型: ${typeof parsed}, 是否数组: ${Array.isArray(parsed)}`)
     
     let rulesToImport: Rule[] = []
     
     if (Array.isArray(parsed)) {
       rulesToImport = parsed
+      logger.info(`解析到规则数组，共 ${parsed.length} 条`)
     } else if (typeof parsed === 'object' && parsed.id) {
       rulesToImport = [parsed]
+      logger.info(`解析到单个规则: ${parsed.name || parsed.id}`)
     } else {
+      logger.warn(`无效的规则格式: ${JSON.stringify(parsed).substring(0, 100)}`)
       return { success: false, error: '无效的规则格式' }
     }
     
@@ -278,15 +304,22 @@ export async function importRules(json: string): Promise<RuleResult<number>> {
     let importedCount = 0
     for (const rule of rulesToImport) {
       if (rule.id && rule.name && rule.host) {
+        logger.debug(`导入规则: ${rule.name} (id=${rule.id}, host=${rule.host})`)
         const addResult = await addRule(rule)
         if (addResult.success) {
           importedCount++
+        } else {
+          logger.warn(`规则 ${rule.name} 导入失败: ${addResult.error}`)
         }
+      } else {
+        logger.warn(`跳过无效规则: id=${rule.id}, name=${rule.name}, host=${rule.host}`)
       }
     }
     
+    logger.info(`规则导入完成: ${importedCount}/${rulesToImport.length} 条成功`)
     return { success: true, data: importedCount }
   } catch (error: any) {
+    logger.error(`导入规则失败: ${error.message}`)
     return { success: false, error: error.message || '导入失败' }
   }
 }

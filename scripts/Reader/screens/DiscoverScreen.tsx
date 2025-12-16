@@ -5,7 +5,7 @@
 
 import {
   Button,
-  Form,
+  List,
   Section,
   Text,
   VStack,
@@ -20,7 +20,7 @@ import {
 import type { Rule, SearchItem, DiscoverItem } from '../types'
 import { getDiscover } from '../services/ruleEngine'
 import { ChapterListScreen } from './ChapterListScreen'
-import { DebugSection, LoadingSection } from '../components/CommonSections'
+import { logger } from '../services/logger'
 
 type DiscoverScreenProps = {
   rule: Rule
@@ -176,22 +176,19 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState('')
   const [nextUrl, setNextUrl] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [currentUrl, setCurrentUrl] = useState('')
+  const [isLastPage, setIsLastPage] = useState(false)
   
   // 使用 ref 标记是否已初始化，避免状态更新导致重复渲染
   const initRef = { current: false }
 
-  // 追加调试日志
-  const appendDebug = (msg: string) => {
-    const timestamp = new Date().toLocaleTimeString()
-    setDebugInfo(prev => prev ? `${prev}\n\n[${timestamp}] ${msg}` : `[${timestamp}] ${msg}`)
-  }
-
   // 加载发现内容 - 参考搜索页的 handleSearch 函数结构
   const loadDiscover = async (url: string, append: boolean = false, pageNum: number = 1) => {
+    // 设置日志上下文
+    logger.setContext({ page: '发现页', rule: rule.name, action: `加载第${pageNum}页` })
+    
     // 设置加载状态
     if (append) {
       setLoadingMore(true)
@@ -200,11 +197,11 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       setItems([])
       setNextUrl(null)
       setPage(1)
-      setDebugInfo('')
+      setIsLastPage(false)
     }
     setError(null)
     
-    appendDebug(`开始加载第 ${pageNum} 页\nURL: ${url}\n规则: discover.list=${rule.discover?.list || '未配置'}`)
+    logger.info(`开始加载第 ${pageNum} 页`, { url, rule: rule.discover?.list || '未配置' })
     
     const result = await getDiscover(rule, url, pageNum)
     
@@ -216,13 +213,42 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       }
       setNextUrl(result.nextUrl || null)
       setPage(pageNum)
-      appendDebug(`第 ${pageNum} 页加载成功，本页 ${result.data.length} 项${result.nextUrl ? '\n下一页: ' + result.nextUrl : ''}`)
+      
+      // 综合判断是否为最后一页
+      const hasNextUrlRule = !!rule.discover?.nextUrl
+      const nextUrlFound = !!result.nextUrl
+      const hasPageVariable = url.includes('$page') || url.includes('{{page}}')
+      const resultEmpty = result.data.length === 0
+      
+      let lastPage = false
+      let reason = ''
+      
+      if (resultEmpty) {
+        // 场景1: 结果为空
+        lastPage = true
+        reason = '本页无结果'
+      } else if (hasNextUrlRule && !nextUrlFound) {
+        // 场景2: 配置了 nextUrl 规则但未找到下一页链接
+        lastPage = true
+        reason = '未找到下一页链接'
+      } else if (!hasNextUrlRule && !hasPageVariable) {
+        // 场景3: 没有 nextUrl 规则也没有页码变量，只能加载一页
+        lastPage = true
+        reason = '规则不支持分页'
+      }
+      
+      setIsLastPage(lastPage)
+      
+      logger.result(true, `第 ${pageNum} 页加载成功，本页 ${result.data.length} 项` + 
+        (lastPage ? ` (已到最后一页: ${reason})` : ''),
+        result.nextUrl ? { nextUrl: result.nextUrl } : undefined
+      )
     } else {
       setError(result.error || '加载失败')
-      appendDebug(`第 ${pageNum} 页加载失败: ${result.error || '未知错误'}`)
+      logger.result(false, `第 ${pageNum} 页加载失败: ${result.error || '未知错误'}`)
     }
     
-    // 结束加载状态 - 参考搜索页在函数末尾设置
+    // 结束加载状态
     setLoading(false)
     setLoadingMore(false)
   }
@@ -255,14 +281,14 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
   const loadMore = () => {
     if (nextUrl) {
       // 使用 nextUrl（已经是完整的下一页 URL）
-      appendDebug(`使用 nextUrl 加载下一页`)
+      logger.debug(`使用 nextUrl 加载下一页`)
       loadDiscover(nextUrl, true, page + 1)
     } else if (currentUrl && (currentUrl.includes('$page') || currentUrl.includes('{{page}}'))) {
       // 使用页码方式加载下一页（currentUrl 是原始模板）
-      appendDebug(`使用页码方式加载第 ${page + 1} 页`)
+      logger.debug(`使用页码方式加载第 ${page + 1} 页`)
       loadDiscover(currentUrl, true, page + 1)
     } else {
-      appendDebug(`无法加载更多：没有 nextUrl 且 URL 不包含页码变量\ncurrentUrl: ${currentUrl}`)
+      logger.warn(`无法加载更多：没有 nextUrl 且 URL 不包含页码变量`, { currentUrl })
     }
   }
 
@@ -279,18 +305,18 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
 
   if (!rule.discover?.enabled || !rule.discover?.url) {
     return (
-      <Form navigationTitle="发现">
+      <List navigationTitle="发现">
         <Section>
           <VStack padding={40} alignment="center">
             <Text foregroundStyle="gray">此书源未启用发现功能</Text>
           </VStack>
         </Section>
-      </Form>
+      </List>
     )
   }
 
   return (
-    <Form navigationTitle={`发现 - ${rule.name}`}>
+    <List navigationTitle={`发现 - ${rule.name}`}>
       {/* 分类标签 */}
       {categories.length > 0 ? (
         <Section header={<Text>分类</Text>}>
@@ -342,101 +368,86 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       ) : null}
 
       {/* 内容列表 */}
-        {!loading && items.length > 0 ? (
-          <>
-            {/* 分页控制 - 当 URL 支持分页时显示 */}
-            {(currentUrl.includes('$page') || currentUrl.includes('{{page}}') || nextUrl) ? (
-              <Section>
-                <HStack spacing={16} frame={{ maxWidth: "infinity" }}>
-                  <Spacer />
-                  <Button
-                    title="上一页"
-                    action={() => {
-                      if (page > 1) {
-                        loadDiscover(currentUrl, false, page - 1)
-                      }
-                    }}
-                    disabled={page <= 1 || loading}
-                    buttonStyle="bordered"
+      {items.length > 0 ? (
+        <Section header={<Text>共 {items.length} 项</Text>}>
+          {items.map((item, index) => (
+            <NavigationLink
+              key={`${item.url}-${index}`}
+              destination={<ChapterListScreen rule={rule} item={item} />}
+            >
+              <HStack spacing={12} padding={{ vertical: 8 }}>
+                {item.cover ? (
+                  <Image 
+                    imageUrl={item.cover} 
+                    frame={{ width: 60, height: 80 }}
+                    resizable
+                    scaleToFit
+                    clipShape={{ type: 'rect', cornerRadius: 8 }}
                   />
-                  <Text font="headline" foregroundStyle="label">
-                    第 {page} 页
-                  </Text>
-                  <Button
-                    title="下一页"
-                    action={() => {
-                      if (nextUrl) {
-                        loadDiscover(nextUrl, false, page + 1)
-                      } else if (currentUrl.includes('$page') || currentUrl.includes('{{page}}')) {
-                        loadDiscover(currentUrl, false, page + 1)
-                      }
-                    }}
-                    disabled={loading || (!nextUrl && !currentUrl.includes('$page') && !currentUrl.includes('{{page}}'))}
-                    buttonStyle="bordered"
-                  />
-                  <Spacer />
-                </HStack>
-              </Section>
-            ) : null}
+                ) : (
+                  <VStack 
+                    frame={{ width: 60, height: 80 }} 
+                    background="secondarySystemFill"
+                    alignment="center"
+                    clipShape={{ type: 'rect', cornerRadius: 8 }}
+                  >
+                    <Text font="title2">📖</Text>
+                  </VStack>
+                )}
+                <VStack alignment="leading" spacing={4}>
+                  <Text font="headline" lineLimit={1}>{item.name}</Text>
+                  {item.author ? (
+                    <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
+                      {item.author}
+                    </Text>
+                  ) : null}
+                  {item.description ? (
+                    <Text font="caption" foregroundStyle="gray" lineLimit={2}>
+                      {item.description}
+                    </Text>
+                  ) : null}
+                </VStack>
+                <Spacer />
+              </HStack>
+            </NavigationLink>
+          ))}
+        </Section>
+      ) : null}
 
-            <Section header={<Text>共 {items.length} 项</Text>}>
-              {items.map((item, index) => (
-                <NavigationLink
-                  key={item.url || index}
-                  destination={<ChapterListScreen rule={rule} item={item} />}
-                >
-                  <HStack spacing={12} padding={{ vertical: 8 }}>
-                    {item.cover ? (
-                      <Image 
-                        imageUrl={item.cover} 
-                        frame={{ width: 60, height: 80 }}
-                        resizable
-                        scaleToFit
-                        clipShape={{ type: 'rect', cornerRadius: 8 }}
-                      />
-                    ) : (
-                      <VStack 
-                        frame={{ width: 60, height: 80 }} 
-                        background="secondarySystemFill"
-                        alignment="center"
-                        clipShape={{ type: 'rect', cornerRadius: 8 }}
-                      >
-                        <Text font="title2">📖</Text>
-                      </VStack>
-                    )}
-                    <VStack alignment="leading" spacing={4}>
-                      <Text font="headline" lineLimit={1}>{item.name}</Text>
-                      {item.author ? (
-                        <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
-                          {item.author}
-                        </Text>
-                      ) : null}
-                      {item.description ? (
-                        <Text font="caption" foregroundStyle="gray" lineLimit={2}>
-                          {item.description}
-                        </Text>
-                      ) : null}
-                    </VStack>
-                    <Spacer />
-                  </HStack>
-                </NavigationLink>
-              ))}
-            </Section>
-          </>
-        ) : null}
+      {/* 底部分页控制 - 当 URL 支持分页或已配置 nextUrl 规则时显示 */}
+      {items.length > 0 && (currentUrl.includes('$page') || currentUrl.includes('{{page}}') || rule.discover?.nextUrl) ? (
+        <Section>
+          {isLastPage ? (
+            <VStack padding={20} alignment="center">
+              <Text font="subheadline" foregroundStyle="secondaryLabel">
+                已加载全部 · 共 {page} 页
+              </Text>
+            </VStack>
+          ) : (
+            <Button
+              title={loadingMore ? "加载中..." : `加载更多 (第 ${page + 1} 页)`}
+              action={() => {
+                if (nextUrl) {
+                  loadDiscover(nextUrl, true, page + 1)
+                } else if (currentUrl.includes('$page') || currentUrl.includes('{{page}}')) {
+                  loadDiscover(currentUrl, true, page + 1)
+                }
+              }}
+              disabled={loadingMore}
+            />
+          )}
+        </Section>
+      ) : null}
 
       {/* 空状态 */}
       {!loading && items.length === 0 && !error ? (
         <Section>
-          <VStack padding={40} alignment="center">
+          <VStack padding={40} alignment="center" frame={{ maxWidth: "infinity" }}>
             <Text foregroundStyle="secondaryLabel" font="headline">暂无内容</Text>
             <Text foregroundStyle="tertiaryLabel" font="caption">尝试切换分类看看</Text>
           </VStack>
         </Section>
       ) : null}
-
-      {/* 调试信息 */}
-      <DebugSection debugInfo={debugInfo} show={debugInfo.length > 0} />
-    </Form>
+    </List>
   )
 }

@@ -7,6 +7,7 @@
  */
 
 import type { Rule, SearchItem, ChapterItem } from '../types'
+import { logger } from './logger'
 
 /**
  * 规则类型
@@ -233,6 +234,7 @@ export class WebAnalyzer {
     error?: string
     debug?: any
   }> {
+    logger.debug(`[WebAnalyzer] 提取搜索结果，列表选择器: ${config.listSelector}`)
     const listType = detectRuleType(config.listSelector)
     const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
@@ -374,6 +376,7 @@ export class WebAnalyzer {
       const result = JSON.parse(resultJson)
       // 添加解析后的规则配置到 debug
       result.debug = { ...result.debug, parsedRules }
+      logger.debug(`[WebAnalyzer] 搜索结果提取完成: ${result.data?.length || 0} 项`)
       return result
     } catch (e) {
       return {
@@ -393,6 +396,7 @@ export class WebAnalyzer {
     error?: string
     debug?: any
   }> {
+    logger.debug(`[WebAnalyzer] 提取章节列表，列表选择器: ${config.listSelector}`)
     const listType = detectRuleType(config.listSelector)
     const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
@@ -525,6 +529,7 @@ export class WebAnalyzer {
     error?: string
   }> {
     const contentRule = config.contentRule.trim()
+    logger.debug(`[WebAnalyzer] 提取正文内容，规则: ${contentRule.substring(0, 50)}...`)
     
     // 检查是否有级联规则（用换行或 @json: 分隔）
     // 例如：@js:...代码...@json:$..url

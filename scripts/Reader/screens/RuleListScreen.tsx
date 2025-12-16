@@ -31,6 +31,7 @@ import {
 } from '../services/ruleStorage'
 import { SearchScreen } from './SearchScreen'
 import { DiscoverScreen } from './DiscoverScreen'
+import { logger } from '../services/logger'
 
 /**
  * 获取内容类型标签
@@ -122,12 +123,15 @@ export function RuleListScreen() {
 
   // 加载规则
   const fetchRules = async () => {
+    logger.info('[RuleListScreen] 加载规则列表')
     setLoading(true)
     setError(null)
     const result = await loadRules()
     if (result.success) {
       setRules(result.data || [])
+      logger.info(`[RuleListScreen] 加载完成，共 ${result.data?.length || 0} 条规则`)
     } else {
+      logger.error(`[RuleListScreen] 加载失败: ${result.error}`)
       setError(result.error || '加载失败')
     }
     setLoading(false)
@@ -144,10 +148,12 @@ export function RuleListScreen() {
       message: '确定要删除这个规则吗？'
     })
     if (confirm) {
+      logger.info(`[RuleListScreen] 删除规则: ${ruleId}`)
       const result = await deleteRule(ruleId)
       if (result.success) {
         fetchRules()
       } else {
+        logger.error(`[RuleListScreen] 删除失败: ${result.error}`)
         await Dialog.alert({ title: '错误', message: result.error || '删除失败' })
       }
     }
@@ -179,8 +185,10 @@ export function RuleListScreen() {
 
   // 从剪贴板导入
   const handleImportFromClipboard = async () => {
+    logger.info('[RuleListScreen] 从剪贴板导入规则')
     const content = await Pasteboard.getString()
     if (!content) {
+      logger.warn('[RuleListScreen] 剪贴板为空')
       await Dialog.alert({ title: '错误', message: '剪贴板为空' })
       return
     }

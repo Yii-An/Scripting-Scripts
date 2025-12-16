@@ -20,7 +20,7 @@ import {
 import type { Rule, SearchItem } from '../types'
 import { search } from '../services/ruleEngine'
 import { ChapterListScreen } from './ChapterListScreen'
-import { ErrorSection, DebugSection, LoadingSection } from '../components/CommonSections'
+import { logger } from '../services/logger'
 
 type SearchScreenProps = {
   rule: Rule
@@ -35,7 +35,6 @@ export function SearchScreen({ rule }: SearchScreenProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
-  const [debugInfo, setDebugInfo] = useState('')
 
   // 执行搜索
   const handleSearch = async () => {
@@ -48,33 +47,25 @@ export function SearchScreen({ rule }: SearchScreenProps) {
     setError(null)
     setSearched(true)
     
-    const baseDebug = `关键词: ${keyword.trim()}\nsearch.url: ${rule.search?.url || '(未配置)'}\nsearch.list: ${rule.search?.list || '(未配置)'}`
-    setDebugInfo(baseDebug + '\n\n搜索中...')
+    // 设置日志上下文
+    logger.setContext({ page: '搜索页', rule: rule.name, action: '搜索' })
+    logger.info(`开始搜索`, { keyword: keyword.trim(), searchUrl: rule.search?.url, listRule: rule.search?.list })
 
-    // 进度回调：实时更新调试信息
+    // 进度回调：实时记录日志
     const onProgress = (message: string) => {
-      setDebugInfo(baseDebug + `\n\n状态: ${message}`)
+      logger.debug(`进度: ${message}`)
     }
 
     const result = await search(rule, keyword.trim(), onProgress)
     
-    // 格式化解析后的规则（用于调试）
-    const formatParsedRules = (debug: any) => {
-      if (!debug?.parsedRules) return ''
-      const pr = debug.parsedRules
-      return `\n\n【解析后的规则】\nlistSelector: ${pr.listSelector}\nisXPath: ${pr.isXPath}\nname: ${JSON.stringify(pr.name)}\ncover: ${JSON.stringify(pr.cover)}\nauthor: ${JSON.stringify(pr.author)}\nchapter: ${JSON.stringify(pr.chapter)}\ndescription: ${JSON.stringify(pr.description)}\nurl: ${JSON.stringify(pr.url)}`
-    }
-    
     if (result.success) {
       setResults(result.data || [])
       setError(null)
-      const debugRules = formatParsedRules(result.debug)
-      setDebugInfo(baseDebug + `\n\n结果: 找到 ${(result.data || []).length} 个结果${debugRules}\n\n数据: ${JSON.stringify(result.data)}`)
+      logger.result(true, `搜索完成，找到 ${(result.data || []).length} 个结果`)
     } else {
       setError(result.error || '搜索失败')
       setResults([])
-      const debugRules = formatParsedRules(result.debug)
-      setDebugInfo(baseDebug + `\n\n错误: ${result.error}${debugRules}`)
+      logger.result(false, result.error || '搜索失败')
     }
     
     setLoading(false)
@@ -152,9 +143,6 @@ export function SearchScreen({ rule }: SearchScreenProps) {
           </VStack>
         </Section>
       ) : null}
-
-      {/* 调试信息（放在底部） */}
-      <DebugSection debugInfo={debugInfo} />
     </Form>
   )
 }

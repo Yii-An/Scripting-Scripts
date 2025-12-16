@@ -20,7 +20,12 @@ import {
 import type { Rule, SearchItem, ChapterItem } from '../types'
 import { getChapterList } from '../services/ruleEngine'
 import { ReaderScreen } from './ReaderScreen'
-import { ErrorSection, DebugSection, LoadingSection } from '../components/CommonSections'
+import { logger } from '../services/logger'
+import { 
+  addToBookshelf, 
+  isInBookshelf, 
+  getReadProgress 
+} from '../services/bookshelfStorage'
 
 type ChapterListScreenProps = {
   rule: Rule
@@ -35,48 +40,45 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
   const [loading, setLoading] = useState(true) // 初始为 true 表示正在加载
   const [error, setError] = useState<string | null>(null)
   
-  // 初始调试信息
-  const getBaseDebug = () => 
-    `请求 URL: ${item.url}\nchapter.url: ${rule.chapter?.url || '(未配置)'}\nchapter.list: ${rule.chapter?.list || '(未配置)'}\nchapter.name: ${rule.chapter?.name || '(未配置)'}\nchapter.result: ${rule.chapter?.result || '(未配置)'}`
+  // 书架状态
+  const [inBookshelf, setInBookshelf] = useState(false)
+  const [lastReadIndex, setLastReadIndex] = useState<number | null>(null)
   
-  const [debugInfo, setDebugInfo] = useState(() => 
-    getBaseDebug() + '\n\n加载中...'
-  )
-
   // 加载章节列表
   const fetchChapters = async () => {
     setLoading(true)
     setError(null)
     
-    const baseDebug = getBaseDebug()
-    setDebugInfo(baseDebug + '\n\n加载中...')
+    // 设置日志上下文
+    logger.setContext({ page: '章节列表', rule: rule.name, action: '加载章节' })
+    logger.info(`开始加载章节`, { 
+      itemUrl: item.url,
+      chapterUrl: rule.chapter?.url,
+      chapterList: rule.chapter?.list
+    })
 
-    // 进度回调：实时更新调试信息
+    // 进度回调：实时记录日志
     const onProgress = (message: string) => {
-      setDebugInfo(baseDebug + `\n\n状态: ${message}`)
+      logger.debug(`进度: ${message}`)
     }
 
     const result = await getChapterList(rule, item.url, onProgress)
     
-    // 格式化解析后的规则（用于调试）
-    const formatParsedRules = (debug: any) => {
-      if (!debug?.parsedRules) return ''
-      const pr = debug.parsedRules
-      return `\n\n【解析后的规则】\nlistSelector: ${pr.listSelector}\nisXPath: ${pr.isXPath}\nname: ${JSON.stringify(pr.name)}\nurl: ${JSON.stringify(pr.url)}\ncover: ${JSON.stringify(pr.cover)}\ntime: ${JSON.stringify(pr.time)}`
-    }
-    
     if (result.success) {
       setChapters(result.data || [])
-      const debugRules = formatParsedRules(result.debug)
       if ((result.data || []).length === 0) {
-        setDebugInfo(baseDebug + `\n\n结果: 解析成功但未找到章节${debugRules}`)
+        logger.warn(`解析成功但未找到章节`, { 
+          itemUrl: item.url,
+          debug: result.debug 
+        })
       } else {
-        setDebugInfo(baseDebug + `\n\n结果: 找到 ${result.data?.length} 个章节${debugRules}`)
+        logger.result(true, `找到 ${result.data?.length} 个章节`)
       }
     } else {
       setError(result.error || '加载失败')
-      const debugRules = formatParsedRules(result.debug)
-      setDebugInfo(baseDebug + `\n\n错误: ${result.error}${debugRules}`)
+      logger.result(false, result.error || '加载失败', {
+        debug: result.debug
+      })
     }
     
     setLoading(false)
@@ -85,6 +87,22 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
   useEffect(() => {
     fetchChapters()
   }, [item.url])
+
+  // 检查书架状态
+  useEffect(() => {
+    isInBookshelf(item.url).then(setInBookshelf)
+    getReadProgress(item.url).then(progress => {
+      if (progress?.chapterIndex !== undefined) {
+        setLastReadIndex(progress.chapterIndex)
+      }
+    })
+  }, [item.url])
+
+  // 添加到书架
+  const handleAddToBookshelf = async () => {
+    const success = await addToBookshelf(item, rule.id, rule.name)
+    if (success) setInBookshelf(true)
+  }
 
   return (
     <Form navigationTitle={item.name}>
@@ -120,6 +138,33 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
         </HStack>
       </Section>
 
+      {/* 操作按钮 */}
+      <Section>
+        <HStack spacing={12}>
+          {inBookshelf ? (
+            <Button title="✓ 已在书架" action={() => {}} disabled />
+          ) : (
+            <Button title="加入书架" action={handleAddToBookshelf} />
+          )}
+          {lastReadIndex !== null && chapters.length > 0 ? (
+            <NavigationLink
+              destination={
+                <ReaderScreen
+                  rule={rule}
+                  chapter={chapters[lastReadIndex]}
+                  bookName={item.name}
+                  bookUrl={item.url}
+                  chapters={chapters}
+                  currentIndex={lastReadIndex}
+                />
+              }
+            >
+              <Text foregroundStyle="link">继续阅读</Text>
+            </NavigationLink>
+          ) : null}
+        </HStack>
+      </Section>
+
       {/* 加载状态 */}
       {loading === true ? (
         <Section>
@@ -140,6 +185,7 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
                   rule={rule} 
                   chapter={chapter}
                   bookName={item.name}
+                  bookUrl={item.url}
                   chapters={chapters}
                   currentIndex={index}
                 />
@@ -164,9 +210,6 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
           </VStack>
         </Section>
       ) : null}
-
-      {/* 调试信息 */}
-      <DebugSection debugInfo={debugInfo} />
     </Form>
   )
 }

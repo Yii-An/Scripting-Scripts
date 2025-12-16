@@ -1,76 +1,61 @@
-import { 
-  Button, 
-  Form, 
-  NavigationStack, 
+/**
+ * 书架页面（首页）
+ * 支持视图切换、滑动删除、编辑模式、排序等功能
+ */
+
+import {
+  Button,
+  Form,
+  NavigationStack,
   NavigationLink,
-  Section, 
-  Text, 
-  VStack, 
+  Section,
+  Text,
+  VStack,
   HStack,
+  LazyVGrid,
+  GridItem,
   Image,
   Spacer,
   useState,
-  useEffect
+  useEffect,
+  Menu,
+  ScrollView
 } from 'scripting'
-import type { SearchItem, Rule } from '../types'
+import type { Rule } from '../types'
 import { ChapterListScreen } from './ChapterListScreen'
 import { RuleListScreen } from './RuleListScreen'
 import { getRule } from '../services/ruleStorage'
 import { logger } from '../services/logger'
+import { SettingsScreen } from './SettingsScreen'
+import {
+  BookshelfItem,
+  BookshelfSettings,
+  SortBy,
+  loadBookshelf,
+  saveBookshelf,
+  removeFromBookshelf,
+  batchRemoveFromBookshelf,
+  sortBookshelf,
+  loadSettings,
+  updateSetting,
+  isUsingiCloud,
+  checkBooksUpdate,
+  shouldAutoCheckUpdate,
+  subscribeToBookshelfUpdates,
+  UpdateCheckProgress
+} from '../services/bookshelfStorage'
 
-/**
- * 书架项类型
- */
-type BookshelfItem = SearchItem & {
-  ruleId: string      // 规则ID
-  ruleName: string    // 规则名称
-  addedAt: number     // 添加时间
-  lastReadAt?: number // 最后阅读时间
-  lastChapter?: string // 最后阅读章节
-}
+// ============================================================
+// 书籍详情页包装器
+// ============================================================
 
-/**
- * 书架存储 Key
- */
-const BOOKSHELF_KEY = 'any-reader-bookshelf'
-
-/**
- * 加载书架数据
- */
-async function loadBookshelf(): Promise<BookshelfItem[]> {
-  try {
-    logger.debug('加载书架数据')
-    const data = await Keychain.get(BOOKSHELF_KEY)
-    if (data) {
-      return JSON.parse(data)
-    }
-  } catch {
-    logger.error('加载书架失败')
-  }
-  return []
-}
-
-/**
- * 保存书架数据
- */
-async function saveBookshelf(items: BookshelfItem[]): Promise<void> {
-  try {
-    await Keychain.set(BOOKSHELF_KEY, JSON.stringify(items))
-  } catch {
-    logger.error('保存书架失败')
-  }
-}
-
-/**
- * 书籍详情页包装器（加载规则后显示章节）
- */
 function BookDetailWrapper({ book }: { book: BookshelfItem }) {
   const [rule, setRule] = useState<Rule | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getRule(book.ruleId).then((result) => {
+    getRule(book.ruleId).then(result => {
       if (result.success && result.data) {
         setRule(result.data)
       } else {
@@ -85,7 +70,7 @@ function BookDetailWrapper({ book }: { book: BookshelfItem }) {
       <Form navigationTitle={book.name}>
         <Section>
           <VStack padding={40} alignment="center">
-            <Text foregroundStyle="gray">加载中...</Text>
+            <Text foregroundStyle="secondaryLabel">加载中...</Text>
           </VStack>
         </Section>
       </Form>
@@ -107,35 +92,252 @@ function BookDetailWrapper({ book }: { book: BookshelfItem }) {
   return <ChapterListScreen rule={rule} item={book} />
 }
 
-/**
- * 书架页面（首页）
- */
-export const HomeScreen = () => {
+// ============================================================
+// 列表视图书籍项
+// ============================================================
+
+function BookListItem({ book, onRemove }: { book: BookshelfItem; onRemove: () => void }) {
+  return (
+    <HStack spacing={12} padding={{ vertical: 8 }}>
+      {book.cover ? (
+        <Image imageUrl={book.cover} frame={{ width: 60, height: 80 }} resizable scaleToFit clipShape={{ type: 'rect', cornerRadius: 4 }} />
+      ) : (
+        <VStack frame={{ width: 60, height: 80 }} background="secondarySystemFill" alignment="center" clipShape={{ type: 'rect', cornerRadius: 4 }}>
+          <Text font="title2">📖</Text>
+        </VStack>
+      )}
+      <VStack alignment="leading" spacing={4}>
+        <HStack>
+          <Text font="headline" lineLimit={1}>
+            {book.name}
+          </Text>
+          {book.hasUpdate ? (
+            <Text foregroundStyle="red" font="caption">
+              ●
+            </Text>
+          ) : null}
+        </HStack>
+        {book.author ? (
+          <Text font="subheadline" foregroundStyle="secondaryLabel" lineLimit={1}>
+            {book.author}
+          </Text>
+        ) : null}
+        {book.lastChapter ? (
+          <Text font="caption" foregroundStyle="tertiaryLabel" lineLimit={1}>
+            上次: {book.lastChapter}
+          </Text>
+        ) : null}
+        <Text font="caption2" foregroundStyle="quaternaryLabel">
+          {book.ruleName}
+        </Text>
+      </VStack>
+      <Spacer />
+    </HStack>
+  )
+}
+
+// ============================================================
+// 网格视图书籍项
+// ============================================================
+
+function BookGridItem({ book }: { book: BookshelfItem }) {
+  return (
+    <VStack spacing={6}>
+      {book.cover ? (
+        <Image imageUrl={book.cover} frame={{ width: 80, height: 110 }} resizable scaleToFit clipShape={{ type: 'rect', cornerRadius: 6 }} />
+      ) : (
+        <VStack frame={{ width: 80, height: 110 }} background="secondarySystemFill" alignment="center" clipShape={{ type: 'rect', cornerRadius: 6 }}>
+          <Text font="title">📖</Text>
+        </VStack>
+      )}
+      <VStack spacing={2}>
+        <HStack spacing={2}>
+          <Text font="caption" lineLimit={1}>
+            {book.name}
+          </Text>
+          {book.hasUpdate ? (
+            <Text foregroundStyle="red" font="caption2">
+              ●
+            </Text>
+          ) : null}
+        </HStack>
+        <Text font="caption2" foregroundStyle="tertiaryLabel" lineLimit={1}>
+          {book.author || book.ruleName}
+        </Text>
+      </VStack>
+    </VStack>
+  )
+}
+
+// ============================================================
+// 排序选项标签
+// ============================================================
+
+const SORT_LABELS: Record<SortBy, string> = {
+  lastRead: '最近阅读',
+  addedAt: '添加时间',
+  name: '书名'
+}
+
+// ============================================================
+// 主页面
+// ============================================================
+
+export function HomeScreen() {
   const [books, setBooks] = useState<BookshelfItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState<BookshelfSettings>({
+    autoCheckUpdate: true,
+    checkUpdateThreads: 3,
+    viewMode: 'list',
+    sortBy: 'lastRead'
+  })
+  const [editMode, setEditMode] = useState(false)
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set())
 
-  // 加载书架
+  // 更新检测状态
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState<UpdateCheckProgress | null>(null)
+
+  // 初始化并加载数据
   useEffect(() => {
-    loadBookshelf().then(items => {
-      // 按最后阅读时间排序
-      items.sort((a, b) => (b.lastReadAt || b.addedAt) - (a.lastReadAt || a.addedAt))
-      setBooks(items)
+    const init = async () => {
+      const [loadedBooks, loadedSettings] = await Promise.all([loadBookshelf(), loadSettings()])
+      const sorted = sortBookshelf(loadedBooks, loadedSettings.sortBy)
+      setBooks(sorted)
+      setSettings(loadedSettings)
       setLoading(false)
-    })
+      // 自动检查更新
+      if (loadedSettings.autoCheckUpdate && loadedBooks.length > 0) {
+        const needCheck = await shouldAutoCheckUpdate()
+        if (needCheck) {
+          handleCheckUpdate(loadedSettings.checkUpdateThreads)
+        }
+      }
+    }
+    init()
   }, [])
 
-  // 删除书籍
-  const removeBook = async (url: string) => {
+  // 监听书架数据变化 (后台更新、阅读进度同步等)
+  useEffect(() => {
+    const unsubscribe = subscribeToBookshelfUpdates(updatedBooks => {
+      // 当底层数据变化时，重新排序并更新 UI
+      // 保持当前的排序方式
+      const sorted = sortBookshelf(updatedBooks, settings.sortBy)
+      setBooks(sorted)
+      logger.debug('书架 UI 已同步更新')
+    })
+    return unsubscribe
+  }, [settings.sortBy]) // 依赖 settings.sortBy 确保回调中使用最新的排序设置
+
+  // 检查更新
+  const handleCheckUpdate = async (threads?: number) => {
+    if (checkingUpdate) return
+
+    setCheckingUpdate(true)
+    setUpdateProgress(null)
+
+    try {
+      const result = await checkBooksUpdate(threads || settings.checkUpdateThreads, progress => setUpdateProgress(progress))
+
+      // 注意：checkBooksUpdate 内部现在会触发各类保存事件，
+      // 通过 useEffect 的 subscribeToBookshelfUpdates 会自动更新列表数据。
+      // 所以这里不需要手动 setBooks(loadingBooks) 了，
+      // 除非我们想强制刷新(但订阅已经处理了)。
+
+      // 显示结果
+      if (result.updated > 0) {
+        await Dialog.alert({
+          title: '检查完成',
+          message: `发现 ${result.updated} 本书有更新`
+        })
+      }
+    } finally {
+      setCheckingUpdate(false)
+      setUpdateProgress(null)
+    }
+  }
+
+  // 刷新书架 (手动触发)
+  const refreshBookshelf = async () => {
+    setLoading(true)
+    const loadedBooks = await loadBookshelf()
+    const sorted = sortBookshelf(loadedBooks, settings.sortBy)
+    setBooks(sorted)
+    setLoading(false)
+  }
+
+  // 删除单本书籍
+  const handleRemoveBook = async (url: string) => {
     const confirmed = await Dialog.confirm({
       title: '确认删除',
       message: '确定要从书架中移除这本书吗？'
     })
-    
+
     if (confirmed) {
-      const newBooks = books.filter(b => b.url !== url)
-      setBooks(newBooks)
-      await saveBookshelf(newBooks)
+      await removeFromBookshelf(url)
+      // UI 更新由 subscription 处理，但为了即时反馈也可以保留本地状态更新，
+      // 不过依靠 subscription 更可靠且不冲突。
+      // setBooks(books.filter(b => b.url !== url))
     }
+  }
+
+  // 批量删除
+  const handleBatchRemove = async () => {
+    if (selectedUrls.size === 0) return
+
+    const confirmed = await Dialog.confirm({
+      title: '确认删除',
+      message: `确定要删除选中的 ${selectedUrls.size} 本书吗？`
+    })
+
+    if (confirmed) {
+      const urls = Array.from(selectedUrls)
+      await batchRemoveFromBookshelf(urls)
+      // UI 更新由 subscription 处理
+      setSelectedUrls(new Set())
+      setEditMode(false)
+    }
+  }
+
+  // 切换选中状态
+  const toggleSelect = (url: string) => {
+    const newSet = new Set(selectedUrls)
+    if (newSet.has(url)) {
+      newSet.delete(url)
+    } else {
+      newSet.add(url)
+    }
+    setSelectedUrls(newSet)
+  }
+
+  // 全选/取消全选
+  const toggleSelectAll = () => {
+    if (selectedUrls.size === books.length) {
+      setSelectedUrls(new Set())
+    } else {
+      setSelectedUrls(new Set(books.map(b => b.url)))
+    }
+  }
+
+  // 切换视图模式
+  const toggleViewMode = async () => {
+    const newMode = settings.viewMode === 'list' ? 'grid' : 'list'
+    await updateSetting('viewMode', newMode)
+    setSettings({ ...settings, viewMode: newMode })
+  }
+
+  // 更改排序
+  const changeSortBy = async (sortBy: SortBy) => {
+    await updateSetting('sortBy', sortBy)
+    setSettings({ ...settings, sortBy })
+    setBooks(sortBookshelf(books, sortBy))
+  }
+
+  // 退出编辑模式
+  const exitEditMode = () => {
+    setEditMode(false)
+    setSelectedUrls(new Set())
   }
 
   return (
@@ -143,133 +345,149 @@ export const HomeScreen = () => {
       <Form
         navigationTitle="书架"
         toolbar={{
-          topBarTrailing: (
-            <NavigationLink destination={<RuleListScreen />}>
-              <Text>书源</Text>
-            </NavigationLink>
+          topBarLeading: editMode ? (
+            <Button title="取消" action={exitEditMode} />
+          ) : (
+            <Menu title="排序">
+              {(['lastRead', 'addedAt', 'name'] as SortBy[]).map(sortBy => (
+                <Button key={sortBy} title={`${SORT_LABELS[sortBy]}${settings.sortBy === sortBy ? ' ✓' : ''}`} action={() => changeSortBy(sortBy)} />
+              ))}
+            </Menu>
+          ),
+          topBarTrailing: editMode ? (
+            <Button title={`删除(${selectedUrls.size})`} action={handleBatchRemove} disabled={selectedUrls.size === 0} />
+          ) : (
+            <HStack spacing={16}>
+              <Button title="" systemImage={settings.viewMode === 'list' ? 'square.grid.2x2' : 'list.bullet'} action={toggleViewMode} />
+              <NavigationLink destination={<RuleListScreen />}>
+                <Text>书源</Text>
+              </NavigationLink>
+            </HStack>
           )
         }}
       >
         {loading ? (
           <Section>
             <VStack padding={40} alignment="center">
-              <Text foregroundStyle="gray">加载中...</Text>
+              <Text foregroundStyle="secondaryLabel">加载中...</Text>
             </VStack>
           </Section>
         ) : books.length === 0 ? (
           <Section>
-            <VStack padding={40} alignment="center" spacing={16} frame={{ maxWidth: "infinity" }}>
+            <VStack padding={40} alignment="center" spacing={16} frame={{ maxWidth: 'infinity' }}>
               <Text font="title2">📚</Text>
-              <Text foregroundStyle="gray">书架空空如也</Text>
-              <Text foregroundStyle="gray" font="caption">
+              <Text foregroundStyle="secondaryLabel">书架空空如也</Text>
+              <Text foregroundStyle="tertiaryLabel" font="caption">
                 去书源搜索添加书籍吧
               </Text>
+              {isUsingiCloud() ? (
+                <Text foregroundStyle="tertiaryLabel" font="caption2">
+                  ☁️ 已启用 iCloud 同步
+                </Text>
+              ) : null}
             </VStack>
           </Section>
         ) : (
-          <Section header={<Text>共 {books.length} 本</Text>}>
-            {books.map((book) => (
-              <NavigationLink
-                key={book.url}
-                destination={<BookDetailWrapper book={book} />}
-              >
-                <HStack spacing={12} padding={{ vertical: 8 }}>
-                  {book.cover ? (
-                    <Image 
-                      imageUrl={book.cover} 
-                      frame={{ width: 60, height: 80 }}
-                      resizable
-                      scaleToFit
-                      clipShape="rect"
-                    />
-                  ) : (
-                    <VStack 
-                      frame={{ width: 60, height: 80 }} 
-                      background="gray"
-                      alignment="center"
-                    >
-                      <Text font="title2">📖</Text>
-                    </VStack>
-                  )}
-                  <VStack alignment="leading" spacing={4}>
-                    <Text font="headline" lineLimit={1}>{book.name}</Text>
-                    {book.author ? (
-                      <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
-                        {book.author}
-                      </Text>
-                    ) : null}
-                    {book.lastChapter ? (
-                      <Text font="caption" foregroundStyle="gray" lineLimit={1}>
-                        上次: {book.lastChapter}
-                      </Text>
-                    ) : null}
-                    <Text font="caption2" foregroundStyle="gray">
-                      {book.ruleName}
+          <>
+            {/* 更新检测进度 */}
+            {checkingUpdate && updateProgress ? (
+              <Section>
+                <VStack spacing={4}>
+                  <HStack>
+                    <Text font="subheadline">
+                      检查更新中 ({updateProgress.current}/{updateProgress.total})
                     </Text>
-                  </VStack>
-                  <Spacer />
-                </HStack>
-              </NavigationLink>
-            ))}
-          </Section>
+                    <Spacer />
+                    <Text font="caption" foregroundStyle="secondaryLabel">
+                      {updateProgress.status === 'checking'
+                        ? '检查中...'
+                        : updateProgress.status === 'updated'
+                          ? '有更新'
+                          : updateProgress.status === 'error'
+                            ? '失败'
+                            : '无更新'}
+                    </Text>
+                  </HStack>
+                  <Text font="caption" foregroundStyle="tertiaryLabel" lineLimit={1}>
+                    {updateProgress.bookName}
+                  </Text>
+                </VStack>
+              </Section>
+            ) : null}
+
+            {/* 信息栏 */}
+            <Section>
+              <HStack>
+                <Text font="subheadline" foregroundStyle="secondaryLabel">
+                  共 {books.length} 本 · {SORT_LABELS[settings.sortBy]}
+                </Text>
+                <Spacer />
+                {!editMode ? (
+                  <HStack spacing={12}>
+                    <Button
+                      title={checkingUpdate ? '检查中...' : '检查更新'}
+                      action={() => handleCheckUpdate()}
+                      disabled={checkingUpdate}
+                      buttonStyle="borderless"
+                    />
+                    <Button title="编辑" action={() => setEditMode(true)} buttonStyle="borderless" />
+                  </HStack>
+                ) : (
+                  <Button title={selectedUrls.size === books.length ? '取消全选' : '全选'} action={toggleSelectAll} />
+                )}
+              </HStack>
+            </Section>
+
+            {/* 书籍列表/网格 */}
+            {settings.viewMode === 'list' ? (
+              <Section>
+                {books.map(book =>
+                  editMode ? (
+                    <Button key={book.url} action={() => toggleSelect(book.url)}>
+                      <HStack>
+                        <Text>{selectedUrls.has(book.url) ? '☑️' : '⬜'}</Text>
+                        <BookListItem book={book} onRemove={() => handleRemoveBook(book.url)} />
+                      </HStack>
+                    </Button>
+                  ) : (
+                    <NavigationLink key={book.url} destination={<BookDetailWrapper book={book} />}>
+                      <BookListItem book={book} onRemove={() => handleRemoveBook(book.url)} />
+                    </NavigationLink>
+                  )
+                )}
+              </Section>
+            ) : (
+              <ScrollView>
+                <LazyVGrid
+                  columns={[
+                    { size: { type: 'flexible' } },
+                    { size: { type: 'flexible' } },
+                    { size: { type: 'flexible' } },
+                    { size: { type: 'flexible' } },
+                    { size: { type: 'flexible' } },
+                    { size: { type: 'flexible' } }
+                  ]}
+                >
+                  {books.map(book =>
+                    editMode ? (
+                      <Button key={book.url} action={() => toggleSelect(book.url)}>
+                        <VStack>
+                          {selectedUrls.has(book.url) ? <Text>☑️</Text> : null}
+                          <BookGridItem book={book} />
+                        </VStack>
+                      </Button>
+                    ) : (
+                      <NavigationLink key={book.url} destination={<BookDetailWrapper book={book} />}>
+                        <BookGridItem book={book} />
+                      </NavigationLink>
+                    )
+                  )}
+                </LazyVGrid>
+              </ScrollView>
+            )}
+          </>
         )}
       </Form>
     </NavigationStack>
   )
-}
-
-/**
- * 添加书籍到书架
- */
-export async function addToBookshelf(
-  item: SearchItem, 
-  ruleId: string, 
-  ruleName: string
-): Promise<boolean> {
-  const books = await loadBookshelf()
-  
-  // 检查是否已存在
-  const exists = books.some(b => b.url === item.url)
-  if (exists) {
-    await Dialog.alert({ title: '提示', message: '书籍已在书架中' })
-    return false
-  }
-  
-  // 添加新书
-  const newBook: BookshelfItem = {
-    ...item,
-    ruleId,
-    ruleName,
-    addedAt: Date.now()
-  }
-  
-  books.unshift(newBook)
-  await saveBookshelf(books)
-  await Dialog.alert({ title: '成功', message: '已添加到书架' })
-  return true
-}
-
-/**
- * 更新阅读进度
- */
-export async function updateReadProgress(
-  url: string, 
-  chapterName: string
-): Promise<void> {
-  const books = await loadBookshelf()
-  const book = books.find(b => b.url === url)
-  
-  if (book) {
-    book.lastReadAt = Date.now()
-    book.lastChapter = chapterName
-    await saveBookshelf(books)
-  }
-}
-
-/**
- * 检查是否在书架中
- */
-export async function isInBookshelf(url: string): Promise<boolean> {
-  const books = await loadBookshelf()
-  return books.some(b => b.url === url)
 }
