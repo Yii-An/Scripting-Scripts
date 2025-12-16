@@ -21,9 +21,5 @@ stats.html
 *.njsproj
 *.sln
 *.sw?
-AGENTS.md
-CLAUDE.md
-GEMINI.md
 /demo/
 /tmp
-.kilocode/*
