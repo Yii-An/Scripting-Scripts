@@ -3,25 +3,8 @@
  * 管理书架和阅读器相关设置
  */
 
-import {
-  Form,
-  Section,
-  Text,
-  VStack,
-  HStack,
-  Toggle,
-  Stepper,
-  Button,
-  Spacer,
-  useState,
-  useEffect
-} from 'scripting'
-import {
-  BookshelfSettings,
-  loadSettings,
-  saveSettings,
-  isUsingiCloud
-} from '../services/bookshelfStorage'
+import { Form, Section, Text, VStack, HStack, Toggle, Stepper, Button, Spacer, useState, useEffect } from 'scripting'
+import { BookshelfSettings, loadSettings, saveSettings, isUsingiCloud } from '../services/bookshelfStorage'
 import { logger } from '../services/logger'
 
 export function SettingsScreen() {
@@ -40,10 +23,7 @@ export function SettingsScreen() {
     })
   }, [])
 
-  const updateSetting = async <K extends keyof BookshelfSettings>(
-    key: K,
-    value: BookshelfSettings[K]
-  ) => {
+  const updateSetting = async <K extends keyof BookshelfSettings>(key: K, value: BookshelfSettings[K]) => {
     logger.info(`[SettingsScreen] 更新设置: ${key} = ${value}`)
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
@@ -68,9 +48,7 @@ export function SettingsScreen() {
       <Section header={<Text>存储</Text>}>
         <HStack>
           <Text>存储位置</Text>
-          <Text foregroundStyle="secondaryLabel">
-            {isUsingiCloud() ? '☁️ iCloud' : '📱 本地'}
-          </Text>
+          <Text foregroundStyle="secondaryLabel">{isUsingiCloud() ? '☁️ iCloud' : '📱 本地'}</Text>
         </HStack>
         {isUsingiCloud() ? (
           <Text font="caption" foregroundStyle="tertiaryLabel">
@@ -85,11 +63,7 @@ export function SettingsScreen() {
 
       {/* 更新检测 */}
       <Section header={<Text>更新检测</Text>}>
-        <Toggle
-          title="自动检查更新"
-          value={settings.autoCheckUpdate}
-          onChanged={(value) => updateSetting('autoCheckUpdate', value)}
-        />
+        <Toggle title="自动检查更新" value={settings.autoCheckUpdate} onChanged={value => updateSetting('autoCheckUpdate', value)} />
         <Text font="caption" foregroundStyle="tertiaryLabel">
           启用后，打开书架时会自动检查收藏书籍的最新章节
         </Text>
@@ -125,9 +99,7 @@ export function SettingsScreen() {
       <Section header={<Text>显示</Text>}>
         <HStack>
           <Text>默认视图</Text>
-          <Text foregroundStyle="secondaryLabel">
-            {settings.viewMode === 'list' ? '📋 列表' : '🔲 网格'}
-          </Text>
+          <Text foregroundStyle="secondaryLabel">{settings.viewMode === 'list' ? '📋 列表' : '🔲 网格'}</Text>
         </HStack>
         <Text font="caption" foregroundStyle="tertiaryLabel">
           可在书架页面顶部切换视图模式

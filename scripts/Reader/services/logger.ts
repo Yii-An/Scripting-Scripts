@@ -9,10 +9,10 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
  * 日志上下文 - 记录当前操作的完整链路
  */
 interface LogContext {
-  page?: string       // 当前页面
-  rule?: string       // 当前使用的规则名称
-  action?: string     // 当前操作
-  url?: string        // 请求的 URL
+  page?: string // 当前页面
+  rule?: string // 当前使用的规则名称
+  action?: string // 当前操作
+  url?: string // 请求的 URL
 }
 
 /**
@@ -21,35 +21,35 @@ interface LogContext {
 class Logger {
   private context: LogContext = {}
   private enabled = true
-  
+
   /**
    * 设置日志上下文
    */
   setContext(ctx: Partial<LogContext>) {
     this.context = { ...this.context, ...ctx }
   }
-  
+
   /**
    * 清除上下文
    */
   clearContext() {
     this.context = {}
   }
-  
+
   /**
    * 格式化日志消息
    */
   private format(level: LogLevel, message: string, data?: unknown): string {
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     const prefix = this.buildPrefix()
-    
+
     let log = `[${time}] [${level.toUpperCase()}]`
     if (prefix) log += ` ${prefix}`
     log += ` ${message}`
-    
+
     return log
   }
-  
+
   /**
    * 构建上下文前缀
    */
@@ -60,7 +60,7 @@ class Logger {
     if (this.context.action) parts.push(`🔄${this.context.action}`)
     return parts.join(' ')
   }
-  
+
   /**
    * 调试日志
    */
@@ -73,7 +73,7 @@ class Logger {
       console.log(log)
     }
   }
-  
+
   /**
    * 信息日志
    */
@@ -86,7 +86,7 @@ class Logger {
       console.log(log)
     }
   }
-  
+
   /**
    * 警告日志
    */
@@ -99,7 +99,7 @@ class Logger {
       console.warn(log)
     }
   }
-  
+
   /**
    * 错误日志
    */
@@ -112,7 +112,7 @@ class Logger {
       console.error(log)
     }
   }
-  
+
   /**
    * 页面日志 - 记录页面加载
    */
@@ -120,7 +120,7 @@ class Logger {
     this.setContext({ page: pageName, action })
     this.info(`${action}`)
   }
-  
+
   /**
    * 规则日志 - 记录规则使用
    */
@@ -132,7 +132,7 @@ class Logger {
       this.warn(`选择器 [${selector}] 未匹配到任何内容`)
     }
   }
-  
+
   /**
    * 请求日志 - 记录 URL 请求
    */
@@ -140,7 +140,7 @@ class Logger {
     this.setContext({ url })
     this.info(`请求 ${url}`)
   }
-  
+
   /**
    * 结果日志 - 记录操作结果
    */

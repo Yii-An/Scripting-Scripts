@@ -1,7 +1,7 @@
 /**
  * WebView 规则分析器
  * 所有解析在 WebView 中执行，使用浏览器原生 API
- * 
+ *
  * 重要：evaluateJavaScript 必须使用顶层 return 语句！
  * 不能使用 IIFE，因为 IIFE 内部的 return 只是函数返回，不是顶层 return
  */
@@ -19,7 +19,7 @@ type RuleType = 'css' | 'xpath' | 'js' | 'json' | 'filter' | 'replace'
  */
 function detectRuleType(rule: string): RuleType {
   const trimmed = rule.trim()
-  
+
   // 显式前缀
   if (trimmed.startsWith('@js:')) return 'js'
   if (trimmed.startsWith('@json:')) return 'json'
@@ -27,11 +27,11 @@ function detectRuleType(rule: string): RuleType {
   if (trimmed.startsWith('@css:')) return 'css'
   if (trimmed.startsWith('@filter:')) return 'filter'
   if (trimmed.startsWith('@replace:')) return 'replace'
-  
+
   // 自动识别
   if (trimmed.startsWith('$.') || trimmed.startsWith('$[')) return 'json'
   if (trimmed.startsWith('//') || trimmed.startsWith('./') || trimmed.startsWith('/')) return 'xpath'
-  
+
   // 默认 CSS
   return 'css'
 }
@@ -56,8 +56,8 @@ function removeRulePrefix(rule: string): string {
 interface ParsedRule {
   selector: string
   attr: string
-  replacePattern?: string  // ## 后的正则模式
-  replaceWith?: string     // ## 后的替换内容
+  replacePattern?: string // ## 后的正则模式
+  replaceWith?: string // ## 后的替换内容
 }
 
 /**
@@ -72,9 +72,9 @@ function parseCssRule(rule: string): ParsedRule {
   if (!rule || !rule.trim()) {
     return { selector: '', attr: '' }
   }
-  
+
   let content = removeRulePrefix(rule)
-  
+
   // 处理 ## 替换操作符
   let replacePattern: string | undefined
   let replaceWith: string | undefined
@@ -82,7 +82,7 @@ function parseCssRule(rule: string): ParsedRule {
   if (hashIndex > -1) {
     const replaceSection = content.slice(hashIndex + 2)
     content = content.slice(0, hashIndex)
-    
+
     // 检查是否有第二个 ## (pattern##replacement)
     const secondHashIndex = replaceSection.indexOf('##')
     if (secondHashIndex > -1) {
@@ -94,30 +94,30 @@ function parseCssRule(rule: string): ParsedRule {
       replaceWith = ''
     }
   }
-  
+
   // 简写规则：text, html, src, href, innerHtml, outerHtml 直接作为属性
   const shorthandAttrs = ['text', 'html', 'src', 'href', 'innerHtml', 'outerHtml', 'textContent']
   if (shorthandAttrs.includes(content)) {
-    return { 
-      selector: '', 
+    return {
+      selector: '',
       attr: content === 'textContent' ? 'text' : content,
       replacePattern,
       replaceWith
     }
   }
-  
+
   const atIndex = content.lastIndexOf('@')
-  
+
   if (atIndex === -1) {
     // 无 @ 符号，默认取 text
     return { selector: content, attr: 'text', replacePattern, replaceWith }
   }
-  
+
   if (atIndex === 0) {
     // @text 格式，无选择器
     return { selector: '', attr: content.slice(1) || 'text', replacePattern, replaceWith }
   }
-  
+
   // selector@attr 格式
   return {
     selector: content.slice(0, atIndex),
@@ -176,11 +176,11 @@ interface ContentConfig {
  */
 export class WebAnalyzer {
   private controller: WebViewController
-  
+
   constructor(controller: WebViewController) {
     this.controller = controller
   }
-  
+
   /**
    * 执行 JavaScript 并返回结果
    * 注意：必须使用顶层 return！
@@ -188,7 +188,7 @@ export class WebAnalyzer {
   private async evaluate<T>(script: string): Promise<T> {
     return await this.controller.evaluateJavaScript<T>(script)
   }
-  
+
   /**
    * 查询元素数量
    */
@@ -196,7 +196,7 @@ export class WebAnalyzer {
     const ruleType = detectRuleType(selector)
     const isXPath = ruleType === 'xpath'
     const cleanSelector = removeRulePrefix(selector)
-    
+
     // 必须使用顶层 return，不能用 IIFE！
     const script = `
       try {
@@ -216,7 +216,7 @@ export class WebAnalyzer {
         return JSON.stringify({ success: false, error: e.message, count: 0 });
       }
     `
-    
+
     const resultJson = await this.evaluate<string>(script)
     try {
       return JSON.parse(resultJson)
@@ -224,7 +224,7 @@ export class WebAnalyzer {
       return { count: 0, error: '解析结果失败' }
     }
   }
-  
+
   /**
    * 提取搜索结果
    */
@@ -238,7 +238,7 @@ export class WebAnalyzer {
     const listType = detectRuleType(config.listSelector)
     const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
-    
+
     // 解析各字段的规则
     const nameRule = parseCssRule(config.nameRule)
     const coverRule = parseCssRule(config.coverRule)
@@ -246,7 +246,7 @@ export class WebAnalyzer {
     const chapterRule = parseCssRule(config.chapterRule)
     const descRule = parseCssRule(config.descriptionRule)
     const urlRule = parseCssRule(config.urlRule)
-    
+
     // 构建 JavaScript 脚本（顶层 return）
     const script = `
       try {
@@ -349,9 +349,9 @@ export class WebAnalyzer {
         });
       }
     `
-    
+
     const resultJson = await this.evaluate<string>(script)
-    
+
     // 解析后的规则配置（用于调试）
     const parsedRules = {
       listSelector: cleanListSelector,
@@ -363,7 +363,7 @@ export class WebAnalyzer {
       description: descRule,
       url: urlRule
     }
-    
+
     if (!resultJson) {
       return {
         success: false,
@@ -371,7 +371,7 @@ export class WebAnalyzer {
         debug: { parsedRules, script: script.substring(0, 500) }
       }
     }
-    
+
     try {
       const result = JSON.parse(resultJson)
       // 添加解析后的规则配置到 debug
@@ -386,7 +386,7 @@ export class WebAnalyzer {
       }
     }
   }
-  
+
   /**
    * 提取章节列表
    */
@@ -400,12 +400,12 @@ export class WebAnalyzer {
     const listType = detectRuleType(config.listSelector)
     const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
-    
+
     const nameRule = parseCssRule(config.nameRule)
     const urlRule = parseCssRule(config.urlRule)
     const coverRule = parseCssRule(config.coverRule || '')
     const timeRule = parseCssRule(config.timeRule || '')
-    
+
     const script = `
       try {
         var listSelector = ${JSON.stringify(cleanListSelector)};
@@ -492,9 +492,9 @@ export class WebAnalyzer {
         });
       }
     `
-    
+
     const resultJson = await this.evaluate<string>(script)
-    
+
     // 解析后的规则配置（用于调试）
     const parsedRules = {
       listSelector: cleanListSelector,
@@ -504,11 +504,11 @@ export class WebAnalyzer {
       cover: coverRule,
       time: timeRule
     }
-    
+
     if (!resultJson) {
       return { success: false, error: 'evaluateJavaScript 返回空值', debug: { parsedRules } }
     }
-    
+
     try {
       const result = JSON.parse(resultJson)
       // 添加解析后的规则配置到 debug
@@ -518,7 +518,7 @@ export class WebAnalyzer {
       return { success: false, error: `JSON 解析失败: ${e}`, debug: { parsedRules } }
     }
   }
-  
+
   /**
    * 提取正文内容
    * 支持：CSS、XPath、@js:、@json: 以及级联规则
@@ -530,36 +530,36 @@ export class WebAnalyzer {
   }> {
     const contentRule = config.contentRule.trim()
     logger.debug(`[WebAnalyzer] 提取正文内容，规则: ${contentRule.substring(0, 50)}...`)
-    
+
     // 检查是否有级联规则（用换行或 @json: 分隔）
     // 例如：@js:...代码...@json:$..url
     const jsonSplitIndex = contentRule.indexOf('@json:')
-    
+
     if (contentRule.startsWith('@js:')) {
       // JavaScript 规则
       let jsCode = contentRule.slice(4) // 移除 @js:
       let jsonPath = ''
-      
+
       // 检查是否有级联的 @json: 规则
       if (jsonSplitIndex > 4) {
         jsCode = contentRule.slice(4, jsonSplitIndex).trim()
         jsonPath = contentRule.slice(jsonSplitIndex + 6).trim()
       }
-      
+
       // 将 JS 代码的最后一行包装成 return 语句
       // 如果最后一行不是 return, 将其变成 return 表达式
       const jsLines = jsCode.trim().split('\n')
       const lastLine = jsLines[jsLines.length - 1].trim()
-      
+
       // 如果最后一行不是 return 语句，也不是空的，将其包装
       if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
         // 移除最后一行的分号（如果有）
         const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
         jsLines[jsLines.length - 1] = `return ${cleanLastLine};`
       }
-      
+
       const wrappedJsCode = jsLines.join('\n')
-      
+
       // 执行 JavaScript 代码，result 变量是页面 HTML
       const script = `
         try {
@@ -569,14 +569,14 @@ export class WebAnalyzer {
           return JSON.stringify({ success: false, error: e.message });
         }
       `
-      
+
       try {
         const jsResult = await this.evaluate<string>(script)
-        
+
         if (!jsResult) {
           return { success: false, error: 'JavaScript 执行返回空值' }
         }
-        
+
         // 检查是否是错误结果
         if (jsResult.startsWith('{') && jsResult.includes('"success":false')) {
           try {
@@ -585,7 +585,7 @@ export class WebAnalyzer {
             // 继续处理
           }
         }
-        
+
         // 如果有 JSONPath，继续处理
         if (jsonPath) {
           // jsResult 现在应该是 JSON 字符串，需要用 JSONPath 提取
@@ -636,7 +636,7 @@ export class WebAnalyzer {
           }
           return { success: false, error: 'JSONPath 执行失败' }
         }
-        
+
         // 没有 JSONPath，直接返回 JS 结果
         // 尝试解析为数组
         try {
@@ -652,13 +652,13 @@ export class WebAnalyzer {
         return { success: false, error: `JavaScript 执行失败: ${e.message}` }
       }
     }
-    
+
     // CSS 或 XPath 规则
     const ruleType = detectRuleType(contentRule)
     const isXPath = ruleType === 'xpath'
     const { selector, attr } = parseCssRule(contentRule)
     const cleanSelector = removeRulePrefix(selector || contentRule)
-    
+
     const script = `
       try {
         var selector = ${JSON.stringify(cleanSelector)};
@@ -699,48 +699,51 @@ export class WebAnalyzer {
         });
       }
     `
-    
+
     const resultJson = await this.evaluate<string>(script)
-    
+
     if (!resultJson) {
       return { success: false, error: 'evaluateJavaScript 返回空值' }
     }
-    
+
     try {
       return JSON.parse(resultJson)
     } catch (e) {
       return { success: false, error: `JSON 解析失败: ${e}` }
     }
   }
-  
+
   /**
    * 获取页面 HTML 预览（调试用）
    */
   async getHtmlPreview(maxLength = 5000): Promise<string> {
     const script = `return document.documentElement.outerHTML.substring(0, ${maxLength})`
     try {
-      return await this.evaluate<string>(script) || ''
+      return (await this.evaluate<string>(script)) || ''
     } catch {
       return ''
     }
   }
-  
+
   /**
    * 获取 body 长度（调试用）
    */
   async getBodyLength(): Promise<number> {
     const script = `return document.body ? document.body.innerHTML.length : 0`
     try {
-      return await this.evaluate<number>(script) || 0
+      return (await this.evaluate<number>(script)) || 0
     } catch {
       return 0
     }
   }
-  
+
   /**
    * 提取单个值（如下一页 URL）
    */
-  async extractSingleValue(rule: string, host: string): Promise<{
+  async extractSingleValue(
+    rule: string,
+    host: string
+  ): Promise<{
     success: boolean
     data?: string
     error?: string
@@ -748,12 +751,12 @@ export class WebAnalyzer {
     if (!rule) {
       return { success: true, data: '' }
     }
-    
+
     const ruleType = detectRuleType(rule)
     const isXPath = ruleType === 'xpath'
     const { selector, attr } = parseCssRule(rule)
     const cleanSelector = removeRulePrefix(selector || rule)
-    
+
     const script = `
       try {
         var selector = ${JSON.stringify(cleanSelector)};
@@ -797,13 +800,13 @@ export class WebAnalyzer {
         return JSON.stringify({ success: false, error: e.message });
       }
     `
-    
+
     const resultJson = await this.evaluate<string>(script)
-    
+
     if (!resultJson) {
       return { success: false, error: 'evaluateJavaScript 返回空值' }
     }
-    
+
     try {
       return JSON.parse(resultJson)
     } catch (e) {

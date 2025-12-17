@@ -3,20 +3,7 @@
  * 显示书源的分类内容（热门、最新、分类等）
  */
 
-import {
-  Button,
-  List,
-  Section,
-  Text,
-  VStack,
-  HStack,
-  Image,
-  Spacer,
-  useState,
-  useEffect,
-  NavigationLink,
-  ScrollView
-} from 'scripting'
+import { Button, List, Section, Text, VStack, HStack, Image, Spacer, useState, useEffect, NavigationLink, ScrollView } from 'scripting'
 import type { Rule, SearchItem, DiscoverItem } from '../types'
 import { getDiscover } from '../services/ruleEngine'
 import { ChapterListScreen } from './ChapterListScreen'
@@ -41,18 +28,18 @@ type DiscoverCategory = {
 function parseDiscoverUrlSync(discoverUrl: string): DiscoverCategory[] {
   const categories: DiscoverCategory[] = []
   const table = new Map<string, number>()
-  
+
   const lines = discoverUrl.split(/\n\s*|&&/)
-  
+
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed) continue
-    
+
     const parts = trimmed.split('::')
     const ruleValue = parts[parts.length - 1].trim()
     let tab = '全部'
     let className = '全部'
-    
+
     if (parts.length === 2) {
       tab = parts[0].trim()
       className = '全部'
@@ -60,7 +47,7 @@ function parseDiscoverUrlSync(discoverUrl: string): DiscoverCategory[] {
       tab = parts[0].trim()
       className = parts[1].trim()
     }
-    
+
     if (!table.has(tab)) {
       table.set(tab, categories.length)
       categories.push({
@@ -72,7 +59,7 @@ function parseDiscoverUrlSync(discoverUrl: string): DiscoverCategory[] {
       categories[index].pairs.push({ name: className, value: ruleValue })
     }
   }
-  
+
   return categories
 }
 
@@ -82,24 +69,24 @@ function parseDiscoverUrlSync(discoverUrl: string): DiscoverCategory[] {
  */
 async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]> {
   const trimmed = discoverUrl.trim()
-  
+
   // 如果不是 @js: 规则，使用同步解析
   if (!trimmed.startsWith('@js:')) {
     return parseDiscoverUrlSync(trimmed)
   }
-  
+
   // 执行 JavaScript 获取分类列表
   const controller = new WebViewController()
   try {
     // 先加载空白页面，才能执行 JavaScript
     await controller.loadURL('about:blank')
-    
+
     let jsCode = trimmed.slice(4).trim()
-    
+
     // 检查是否是 IIFE 表达式 (立即执行函数)
     // 格式: (() => { ... })() 或 (function() { ... })()
     const isIIFE = /^\s*\([\s\S]*\)\s*\(\s*\)\s*;?\s*$/.test(jsCode)
-    
+
     let wrappedCode: string
     if (isIIFE) {
       // IIFE 表达式：整体包装成 return JSON.stringify(...)
@@ -109,7 +96,7 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
       // 普通代码：将最后一行包装成 return 语句
       const jsLines = jsCode.split('\n')
       const lastLine = jsLines[jsLines.length - 1].trim()
-      
+
       if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
         const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
         jsLines[jsLines.length - 1] = `return JSON.stringify(${cleanLastLine});`
@@ -119,7 +106,7 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
       }
       wrappedCode = jsLines.join('\n')
     }
-    
+
     // 执行 JavaScript
     const script = `
       try {
@@ -128,28 +115,28 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
         return JSON.stringify({ error: e.message });
       }
     `
-    
+
     const result = await controller.evaluateJavaScript<string>(script)
-    
+
     if (!result) {
       return []
     }
-    
+
     // 尝试解析 JSON
     try {
       const parsed = JSON.parse(result)
-      
+
       // 如果是错误对象
       if (parsed && typeof parsed === 'object' && parsed.error) {
         // JS 执行错误，静默处理
         return []
       }
-      
+
       // 如果是数组，解析为分类
       if (Array.isArray(parsed)) {
         return parseDiscoverUrlSync(parsed.join('\n'))
       }
-      
+
       // 如果是字符串，直接解析
       if (typeof parsed === 'string') {
         return parseDiscoverUrlSync(parsed)
@@ -158,7 +145,7 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
       // JSON 解析失败，当作普通字符串处理
       return parseDiscoverUrlSync(result)
     }
-    
+
     return []
   } finally {
     controller.dispose()
@@ -180,7 +167,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
   const [page, setPage] = useState(1)
   const [currentUrl, setCurrentUrl] = useState('')
   const [isLastPage, setIsLastPage] = useState(false)
-  
+
   // 使用 ref 标记是否已初始化，避免状态更新导致重复渲染
   const initRef = { current: false }
 
@@ -188,7 +175,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
   const loadDiscover = async (url: string, append: boolean = false, pageNum: number = 1) => {
     // 设置日志上下文
     logger.setContext({ page: '发现页', rule: rule.name, action: `加载第${pageNum}页` })
-    
+
     // 设置加载状态
     if (append) {
       setLoadingMore(true)
@@ -200,11 +187,11 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       setIsLastPage(false)
     }
     setError(null)
-    
+
     logger.info(`开始加载第 ${pageNum} 页`, { url, rule: rule.discover?.list || '未配置' })
-    
+
     const result = await getDiscover(rule, url, pageNum)
-    
+
     if (result.success && result.data) {
       if (append) {
         setItems(prev => [...prev, ...result.data!])
@@ -213,16 +200,16 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       }
       setNextUrl(result.nextUrl || null)
       setPage(pageNum)
-      
+
       // 综合判断是否为最后一页
       const hasNextUrlRule = !!rule.discover?.nextUrl
       const nextUrlFound = !!result.nextUrl
       const hasPageVariable = url.includes('$page') || url.includes('{{page}}')
       const resultEmpty = result.data.length === 0
-      
+
       let lastPage = false
       let reason = ''
-      
+
       if (resultEmpty) {
         // 场景1: 结果为空
         lastPage = true
@@ -236,18 +223,19 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
         lastPage = true
         reason = '规则不支持分页'
       }
-      
+
       setIsLastPage(lastPage)
-      
-      logger.result(true, `第 ${pageNum} 页加载成功，本页 ${result.data.length} 项` + 
-        (lastPage ? ` (已到最后一页: ${reason})` : ''),
+
+      logger.result(
+        true,
+        `第 ${pageNum} 页加载成功，本页 ${result.data.length} 项` + (lastPage ? ` (已到最后一页: ${reason})` : ''),
         result.nextUrl ? { nextUrl: result.nextUrl } : undefined
       )
     } else {
       setError(result.error || '加载失败')
       logger.result(false, `第 ${pageNum} 页加载失败: ${result.error || '未知错误'}`)
     }
-    
+
     // 结束加载状态
     setLoading(false)
     setLoadingMore(false)
@@ -257,9 +245,9 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
-    
+
     if (!rule.discover?.url) return
-    
+
     // 异步解析分类并加载
     const init = async () => {
       try {
@@ -332,7 +320,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
               ))}
             </HStack>
           </ScrollView>
-          
+
           {/* 子分类 */}
           {categories[selectedCategory]?.pairs.length > 1 ? (
             <ScrollView axes="horizontal">
@@ -371,31 +359,19 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       {items.length > 0 ? (
         <Section header={<Text>共 {items.length} 项</Text>}>
           {items.map((item, index) => (
-            <NavigationLink
-              key={`${item.url}-${index}`}
-              destination={<ChapterListScreen rule={rule} item={item} />}
-            >
+            <NavigationLink key={`${item.url}-${index}`} destination={<ChapterListScreen rule={rule} item={item} />}>
               <HStack spacing={12} padding={{ vertical: 8 }}>
                 {item.cover ? (
-                  <Image 
-                    imageUrl={item.cover} 
-                    frame={{ width: 60, height: 80 }}
-                    resizable
-                    scaleToFit
-                    clipShape={{ type: 'rect', cornerRadius: 8 }}
-                  />
+                  <Image imageUrl={item.cover} frame={{ width: 60, height: 80 }} resizable scaleToFit clipShape={{ type: 'rect', cornerRadius: 8 }} />
                 ) : (
-                  <VStack 
-                    frame={{ width: 60, height: 80 }} 
-                    background="secondarySystemFill"
-                    alignment="center"
-                    clipShape={{ type: 'rect', cornerRadius: 8 }}
-                  >
+                  <VStack frame={{ width: 60, height: 80 }} background="secondarySystemFill" alignment="center" clipShape={{ type: 'rect', cornerRadius: 8 }}>
                     <Text font="title2">📖</Text>
                   </VStack>
                 )}
                 <VStack alignment="leading" spacing={4}>
-                  <Text font="headline" lineLimit={1}>{item.name}</Text>
+                  <Text font="headline" lineLimit={1}>
+                    {item.name}
+                  </Text>
                   {item.author ? (
                     <Text font="subheadline" foregroundStyle="gray" lineLimit={1}>
                       {item.author}
@@ -425,7 +401,7 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
             </VStack>
           ) : (
             <Button
-              title={loadingMore ? "加载中..." : `加载更多 (第 ${page + 1} 页)`}
+              title={loadingMore ? '加载中...' : `加载更多 (第 ${page + 1} 页)`}
               action={() => {
                 if (nextUrl) {
                   loadDiscover(nextUrl, true, page + 1)
@@ -442,9 +418,13 @@ export function DiscoverScreen({ rule }: DiscoverScreenProps) {
       {/* 空状态 */}
       {!loading && items.length === 0 && !error ? (
         <Section>
-          <VStack padding={40} alignment="center" frame={{ maxWidth: "infinity" }}>
-            <Text foregroundStyle="secondaryLabel" font="headline">暂无内容</Text>
-            <Text foregroundStyle="tertiaryLabel" font="caption">尝试切换分类看看</Text>
+          <VStack padding={40} alignment="center" frame={{ maxWidth: 'infinity' }}>
+            <Text foregroundStyle="secondaryLabel" font="headline">
+              暂无内容
+            </Text>
+            <Text foregroundStyle="tertiaryLabel" font="caption">
+              尝试切换分类看看
+            </Text>
           </VStack>
         </Section>
       ) : null}

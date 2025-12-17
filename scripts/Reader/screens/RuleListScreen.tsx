@@ -3,32 +3,10 @@
  * 每个规则一个列表项，点击进入详情页选择搜索或发现
  */
 
-import {
-  Button,
-  Form,
-  NavigationStack,
-  Section,
-  Text,
-  TextField,
-  VStack,
-  HStack,
-  Spacer,
-  useState,
-  useEffect,
-  Image,
-  NavigationLink
-} from 'scripting'
+import { Button, Form, NavigationStack, Section, Text, TextField, VStack, HStack, Spacer, useState, useEffect, Image, NavigationLink } from 'scripting'
 import type { Rule } from '../types'
 import { UniversalContentType, UniversalContentTypeLabels } from '../types'
-import {
-  loadRules,
-  deleteRule,
-  clearAllRules,
-  parseRuleJson,
-  addRule,
-  importRules,
-  updateRulesFromUrl
-} from '../services/ruleStorage'
+import { loadRules, deleteRule, clearAllRules, parseRuleJson, addRule, importRules, updateRulesFromUrl } from '../services/ruleStorage'
 import { SearchScreen } from './SearchScreen'
 import { DiscoverScreen } from './DiscoverScreen'
 import { logger } from '../services/logger'
@@ -81,7 +59,7 @@ function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Prom
             <Text foregroundStyle="tertiaryLabel">🔍 搜索（未启用）</Text>
           </HStack>
         )}
-        
+
         {rule.discover?.enabled ? (
           <NavigationLink destination={<DiscoverScreen rule={rule} />}>
             <HStack>
@@ -98,11 +76,7 @@ function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Prom
 
       {/* 操作 */}
       <Section>
-        <Button
-          title="删除此书源"
-          action={onDelete}
-          foregroundStyle="red"
-        />
+        <Button title="删除此书源" action={onDelete} foregroundStyle="red" />
       </Section>
     </Form>
   )
@@ -254,29 +228,16 @@ export function RuleListScreen() {
       <Form
         navigationTitle="书源管理"
         toolbar={{
-          topBarLeading: (
-            <Button
-              title="刷新"
-              action={fetchRules}
-              disabled={loading}
-            />
-          ),
+          topBarLeading: <Button title="刷新" action={fetchRules} disabled={loading} />,
           topBarTrailing: (
             <HStack spacing={16}>
-              <Button
-                title="添加"
-                action={() => setShowAddSheet(true)}
-              />
+              <Button title="添加" action={() => setShowAddSheet(true)} />
               <Button
                 title="更多"
                 action={async () => {
                   const result = await Dialog.actionSheet({
                     title: '更多操作',
-                    actions: [
-                      { label: '从剪贴板导入' },
-                      { label: '从 URL 更新' },
-                      { label: '清空全部书源', destructive: true }
-                    ]
+                    actions: [{ label: '从剪贴板导入' }, { label: '从 URL 更新' }, { label: '清空全部书源', destructive: true }]
                   })
                   if (result === 0) {
                     handleImportFromClipboard()
@@ -294,7 +255,7 @@ export function RuleListScreen() {
         {/* 加载状态 */}
         {loading ? (
           <Section>
-            <VStack padding={60} alignment="center" frame={{ maxWidth: "infinity" }}>
+            <VStack padding={60} alignment="center" frame={{ maxWidth: 'infinity' }}>
               <Text foregroundStyle="secondaryLabel">加载中...</Text>
             </VStack>
           </Section>
@@ -303,7 +264,7 @@ export function RuleListScreen() {
         {/* 错误信息 */}
         {error ? (
           <Section>
-            <VStack padding={60} alignment="center" frame={{ maxWidth: "infinity" }}>
+            <VStack padding={60} alignment="center" frame={{ maxWidth: 'infinity' }}>
               <Text foregroundStyle="red">{error}</Text>
             </VStack>
           </Section>
@@ -312,31 +273,13 @@ export function RuleListScreen() {
         {/* 规则列表 - 每个规则一行，点击进入详情页 */}
         {rules.length > 0 ? (
           <Section header={<Text>已导入 {rules.length} 个书源</Text>}>
-            {rules.map((rule) => (
-              <NavigationLink
-                key={rule.id}
-                destination={
-                  <RuleDetailScreen
-                    rule={rule}
-                    onDelete={async () => handleDelete(rule.id)}
-                  />
-                }
-              >
+            {rules.map(rule => (
+              <NavigationLink key={rule.id} destination={<RuleDetailScreen rule={rule} onDelete={async () => handleDelete(rule.id)} />}>
                 <HStack spacing={12} padding={{ vertical: 4 }}>
                   {rule.icon ? (
-                    <Image
-                      imageUrl={rule.icon}
-                      resizable
-                      frame={{ width: 44, height: 44 }}
-                      clipShape={{ type: 'rect', cornerRadius: 8 }}
-                    />
+                    <Image imageUrl={rule.icon} resizable frame={{ width: 44, height: 44 }} clipShape={{ type: 'rect', cornerRadius: 8 }} />
                   ) : (
-                    <VStack
-                      frame={{ width: 44, height: 44 }}
-                      background="systemBlue"
-                      alignment="center"
-                      clipShape={{ type: 'rect', cornerRadius: 8 }}
-                    >
+                    <VStack frame={{ width: 44, height: 44 }} background="systemBlue" alignment="center" clipShape={{ type: 'rect', cornerRadius: 8 }}>
                       <Text foregroundStyle="white">{rule.name.charAt(0)}</Text>
                     </VStack>
                   )}
@@ -358,20 +301,17 @@ export function RuleListScreen() {
           </Section>
         ) : !loading ? (
           <Section>
-            <VStack padding={60} alignment="center" spacing={20} frame={{ maxWidth: "infinity" }}>
+            <VStack padding={60} alignment="center" spacing={20} frame={{ maxWidth: 'infinity' }}>
               <Text font={80}>📚</Text>
               <VStack spacing={8}>
-                <Text font="title2" fontWeight="semibold">暂无书源</Text>
+                <Text font="title2" fontWeight="semibold">
+                  暂无书源
+                </Text>
                 <Text font="subheadline" foregroundStyle="secondaryLabel">
                   快来添加你喜欢的阅读源吧
                 </Text>
               </VStack>
-              <Button
-                title="从剪贴板导入"
-                action={handleImportFromClipboard}
-                buttonStyle="borderedProminent"
-                controlSize="large"
-              />
+              <Button title="从剪贴板导入" action={handleImportFromClipboard} buttonStyle="borderedProminent" controlSize="large" />
             </VStack>
           </Section>
         ) : null}
@@ -379,14 +319,7 @@ export function RuleListScreen() {
         {/* 添加规则 Sheet */}
         {showAddSheet ? (
           <Section header={<Text>添加书源</Text>}>
-            <TextField
-              title="规则 JSON"
-              value={ruleJson}
-              onChanged={setRuleJson}
-              prompt="粘贴规则 JSON..."
-              axis="vertical"
-              lineLimit={{ min: 5, max: 10 }}
-            />
+            <TextField title="规则 JSON" value={ruleJson} onChanged={setRuleJson} prompt="粘贴规则 JSON..." axis="vertical" lineLimit={{ min: 5, max: 10 }} />
             <HStack spacing={12}>
               <Button
                 title="取消"
@@ -404,10 +337,7 @@ export function RuleListScreen() {
                   if (content) setRuleJson(content)
                 }}
               />
-              <Button
-                title="添加"
-                action={handleAddRule}
-              />
+              <Button title="添加" action={handleAddRule} />
             </HStack>
           </Section>
         ) : null}
@@ -415,12 +345,7 @@ export function RuleListScreen() {
         {/* 更新书源 Sheet */}
         {showUpdateSheet ? (
           <Section header={<Text>从 URL 更新书源</Text>}>
-            <TextField
-              title="书源 URL"
-              value={updateUrl}
-              onChanged={setUpdateUrl}
-              prompt="输入书源 JSON 的 URL..."
-            />
+            <TextField title="书源 URL" value={updateUrl} onChanged={setUpdateUrl} prompt="输入书源 JSON 的 URL..." />
             <HStack spacing={12}>
               <Button
                 title="取消"
@@ -438,11 +363,7 @@ export function RuleListScreen() {
                   if (content) setUpdateUrl(content)
                 }}
               />
-              <Button
-                title={updating ? '更新中...' : '更新'}
-                action={handleUpdateFromUrl}
-                disabled={updating}
-              />
+              <Button title={updating ? '更新中...' : '更新'} action={handleUpdateFromUrl} disabled={updating} />
             </HStack>
           </Section>
         ) : null}

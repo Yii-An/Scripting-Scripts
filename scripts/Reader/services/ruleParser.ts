@@ -15,7 +15,7 @@ export type RuleType = 'css' | 'json' | 'xpath' | 'js' | 'filter' | 'replace' | 
  */
 export function parseRuleType(rule: string): { type: RuleType; content: string } {
   const trimmed = rule.trim()
-  
+
   if (trimmed.startsWith('@css:')) {
     return { type: 'css', content: trimmed.slice(5) }
   }
@@ -34,7 +34,7 @@ export function parseRuleType(rule: string): { type: RuleType; content: string }
   if (trimmed.startsWith('@replace:')) {
     return { type: 'replace', content: trimmed.slice(9) }
   }
-  
+
   // 自动识别规则类型
   if (trimmed.startsWith('$.') || trimmed.startsWith('$[')) {
     return { type: 'json', content: trimmed }
@@ -42,7 +42,7 @@ export function parseRuleType(rule: string): { type: RuleType; content: string }
   if (trimmed.startsWith('//') || trimmed.startsWith('/')) {
     return { type: 'xpath', content: trimmed }
   }
-  
+
   // 默认为 CSS 选择器
   return { type: 'css', content: trimmed }
 }
@@ -59,16 +59,16 @@ export function parseJsonRule(data: any, path: string): any {
       return null
     }
   }
-  
+
   // 简单的 JSONPath 解析
   const parts = path.replace(/^\$\.?/, '').split('.')
   let current = data
-  
+
   for (const part of parts) {
     if (current === null || current === undefined) {
       return null
     }
-    
+
     // 处理数组索引 field[0] 或 field[:1]
     const arrayMatch = part.match(/^(\w+)\[(\d+|:\d+)\]$/)
     if (arrayMatch) {
@@ -86,7 +86,7 @@ export function parseJsonRule(data: any, path: string): any {
       current = current[part]
     }
   }
-  
+
   return current
 }
 
@@ -95,7 +95,7 @@ export function parseJsonRule(data: any, path: string): any {
  */
 export function replaceVariables(rule: string, context: ParseContext): string {
   let result = rule
-  
+
   // 替换 {{}} 变量
   result = result.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
     const trimmed = expr.trim()
@@ -111,10 +111,10 @@ export function replaceVariables(rule: string, context: ParseContext): string {
     }
     return ''
   })
-  
+
   // 替换 $host 变量
   result = result.replace(/\$host/g, context.host || '')
-  
+
   return result
 }
 
@@ -127,7 +127,7 @@ export function processRegexReplace(value: string, rule: string): string {
   if (parts.length < 2) {
     return value
   }
-  
+
   const [, match, replacement = ''] = parts
   try {
     const regex = new RegExp(match, 'g')

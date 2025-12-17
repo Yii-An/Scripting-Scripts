@@ -1,4 +1,6 @@
 {
   "typescript.format.semicolons": "remove",
   "typescript.preferences.jsxAttributeCompletionStyle": "braces",
+  "files.encoding": "utf8",
+"files.autoGuessEncoding": true
 }

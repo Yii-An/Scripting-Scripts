@@ -5,7 +5,6 @@ import pluginPrettier from 'eslint-plugin-prettier'
 import tseslint from 'typescript-eslint'
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 import prettierRule from './prettier.config.mts'
 
 export default [
@@ -37,7 +36,6 @@ export default [
       '/bin',
       '/src/mock/*',
       'stats.html',
-      '',
       'logs',
       '*.log',
       'npm-debug.log*',
@@ -56,8 +54,7 @@ export default [
       '*.njsproj',
       '*.sln',
       '*.sw?',
-      'watch.ts',
-      'scripts/挂历小组件/utils/lunar.js'
+      'watch.ts'
     ]
   },
 

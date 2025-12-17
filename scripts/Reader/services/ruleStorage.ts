@@ -23,17 +23,17 @@ function getRulesFilePath(): string {
 export async function loadRules(): Promise<RuleResult<Rule[]>> {
   try {
     const filePath = getRulesFilePath()
-    
+
     const fileExists = await FileManager.exists(filePath)
     if (!fileExists) {
       return { success: true, data: [] }
     }
-    
+
     const content = await FileManager.readAsString(filePath)
     if (!content) {
       return { success: true, data: [] }
     }
-    
+
     const rules = JSON.parse(content) as Rule[]
     return { success: true, data: rules }
   } catch (error: any) {
@@ -69,14 +69,20 @@ export async function saveRules(rules: Rule[]): Promise<RuleResult<void>> {
  */
 export async function addRule(rule: Rule): Promise<RuleResult<void>> {
   try {
+    // 校验必填字段
+    if (!rule.id || !rule.name || !rule.host) {
+      logger.warn(`规则缺少必要字段: id=${rule.id}, name=${rule.name}, host=${rule.host}`)
+      return { success: false, error: '规则缺少必要字段 (id, name, host)' }
+    }
+
     logger.info(`正在添加规则: ${rule.name} (${rule.id})`)
     const result = await loadRules()
     if (!result.success) {
       return { success: false, error: result.error }
     }
-    
+
     const rules = result.data || []
-    
+
     // 检查是否已存在
     const existingIndex = rules.findIndex(r => r.id === rule.id)
     if (existingIndex >= 0) {
@@ -86,7 +92,7 @@ export async function addRule(rule: Rule): Promise<RuleResult<void>> {
       rules.push(rule)
       logger.info(`规则已添加: ${rule.name}`)
     }
-    
+
     return await saveRules(rules)
   } catch (error: any) {
     logger.error(`添加规则失败: ${error.message}`)
@@ -104,14 +110,14 @@ export async function deleteRule(ruleId: string): Promise<RuleResult<void>> {
     if (!result.success) {
       return { success: false, error: result.error }
     }
-    
+
     const rules = result.data || []
     const filteredRules = rules.filter(r => r.id !== ruleId)
-    
+
     if (filteredRules.length < rules.length) {
       logger.info(`规则已删除`)
     }
-    
+
     return await saveRules(filteredRules)
   } catch (error: any) {
     logger.error(`删除规则失败: ${error.message}`)
@@ -139,10 +145,10 @@ export async function getRule(ruleId: string): Promise<RuleResult<Rule | null>> 
     if (!result.success) {
       return { success: false, error: result.error }
     }
-    
+
     const rules = result.data || []
     const rule = rules.find(r => r.id === ruleId) || null
-    
+
     return { success: true, data: rule }
   } catch (error: any) {
     return { success: false, error: error.message || '获取规则失败' }
@@ -155,17 +161,17 @@ export async function getRule(ruleId: string): Promise<RuleResult<Rule | null>> 
 export function parseRuleJson(json: string): RuleResult<Rule> {
   try {
     const rule = JSON.parse(json) as Rule
-    
+
     // 验证必须字段
     if (!rule.id || !rule.name || !rule.host) {
       return { success: false, error: '规则缺少必要字段 (id, name, host)' }
     }
-    
+
     // 设置默认值
     if (rule.contentType === undefined) {
       rule.contentType = UniversalContentType.NOVEL // 默认小说
     }
-    
+
     return { success: true, data: rule }
   } catch (error: any) {
     return { success: false, error: '无效的 JSON 格式' }
@@ -176,9 +182,9 @@ export function parseRuleJson(json: string): RuleResult<Rule> {
  * 生成规则 ID
  */
 export function generateRuleId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0
-    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
 }
@@ -199,7 +205,7 @@ export async function exportAllRules(): Promise<RuleResult<string>> {
     if (!result.success) {
       return { success: false, error: result.error }
     }
-    
+
     const json = JSON.stringify(result.data, null, 2)
     return { success: true, data: json }
   } catch (error: any) {
@@ -240,7 +246,7 @@ export async function updateRulesFromUrl(url: string): Promise<RuleResult<{ adde
 
     // 加载现有规则
     const existingResult = await loadRules()
-    const existingRules = existingResult.success ? (existingResult.data || []) : []
+    const existingRules = existingResult.success ? existingResult.data || [] : []
     const existingMap = new Map(existingRules.map(r => [r.id, r]))
 
     // 统计
@@ -283,12 +289,12 @@ export async function importRules(json: string): Promise<RuleResult<number>> {
   try {
     logger.info(`开始导入规则，JSON 长度: ${json.length}`)
     logger.debug(`导入内容预览: ${json.substring(0, 200)}...`)
-    
+
     const parsed = JSON.parse(json)
     logger.debug(`JSON 解析成功，类型: ${typeof parsed}, 是否数组: ${Array.isArray(parsed)}`)
-    
+
     let rulesToImport: Rule[] = []
-    
+
     if (Array.isArray(parsed)) {
       rulesToImport = parsed
       logger.info(`解析到规则数组，共 ${parsed.length} 条`)
@@ -299,7 +305,7 @@ export async function importRules(json: string): Promise<RuleResult<number>> {
       logger.warn(`无效的规则格式: ${JSON.stringify(parsed).substring(0, 100)}`)
       return { success: false, error: '无效的规则格式' }
     }
-    
+
     // 验证并添加每个规则
     let importedCount = 0
     for (const rule of rulesToImport) {
@@ -315,7 +321,7 @@ export async function importRules(json: string): Promise<RuleResult<number>> {
         logger.warn(`跳过无效规则: id=${rule.id}, name=${rule.name}, host=${rule.host}`)
       }
     }
-    
+
     logger.info(`规则导入完成: ${importedCount}/${rulesToImport.length} 条成功`)
     return { success: true, data: importedCount }
   } catch (error: any) {

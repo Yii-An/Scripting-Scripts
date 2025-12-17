@@ -42,7 +42,8 @@ import {
   checkBooksUpdate,
   shouldAutoCheckUpdate,
   subscribeToBookshelfUpdates,
-  UpdateCheckProgress
+  UpdateCheckProgress,
+  buildUrl
 } from '../services/bookshelfStorage'
 
 // ============================================================
@@ -89,7 +90,12 @@ function BookDetailWrapper({ book }: { book: BookshelfItem }) {
     )
   }
 
-  return <ChapterListScreen rule={rule} item={book} />
+  // 将 BookshelfItem 转换为 ChapterListScreen 需要的 SearchItem 格式
+  const itemWithUrl = {
+    ...book,
+    url: buildUrl(book.path, rule.host)
+  }
+  return <ChapterListScreen rule={rule} item={itemWithUrl} />
 }
 
 // ============================================================
@@ -107,14 +113,20 @@ function BookListItem({ book, onRemove }: { book: BookshelfItem; onRemove: () =>
         </VStack>
       )}
       <VStack alignment="leading" spacing={4}>
-        <HStack>
+        <HStack spacing={4}>
           <Text font="headline" lineLimit={1}>
             {book.name}
           </Text>
           {book.hasUpdate ? (
-            <Text foregroundStyle="red" font="caption">
-              ●
-            </Text>
+            book.isReorganized ? (
+              <HStack spacing={2}>
+                <Text foregroundStyle="orange" font="caption2">🔄 有变化</Text>
+              </HStack>
+            ) : book.updateCount && book.updateCount > 0 ? (
+              <Text foregroundStyle="red" font="caption">+{book.updateCount}</Text>
+            ) : (
+              <Text foregroundStyle="red" font="caption">●</Text>
+            )
           ) : null}
         </HStack>
         {book.author ? (
@@ -156,9 +168,13 @@ function BookGridItem({ book }: { book: BookshelfItem }) {
             {book.name}
           </Text>
           {book.hasUpdate ? (
-            <Text foregroundStyle="red" font="caption2">
-              ●
-            </Text>
+            book.isReorganized ? (
+              <Text foregroundStyle="orange" font="caption2">🔄</Text>
+            ) : book.updateCount && book.updateCount > 0 ? (
+              <Text foregroundStyle="red" font="caption2">+{book.updateCount}</Text>
+            ) : (
+              <Text foregroundStyle="red" font="caption2">●</Text>
+            )
           ) : null}
         </HStack>
         <Text font="caption2" foregroundStyle="tertiaryLabel" lineLimit={1}>
@@ -193,7 +209,7 @@ export function HomeScreen() {
     sortBy: 'lastRead'
   })
   const [editMode, setEditMode] = useState(false)
-  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set())
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
 
   // 更新检测状态
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -268,55 +284,53 @@ export function HomeScreen() {
   }
 
   // 删除单本书籍
-  const handleRemoveBook = async (url: string) => {
+  const handleRemoveBook = async (path: string) => {
     const confirmed = await Dialog.confirm({
       title: '确认删除',
       message: '确定要从书架中移除这本书吗？'
     })
 
     if (confirmed) {
-      await removeFromBookshelf(url)
-      // UI 更新由 subscription 处理，但为了即时反馈也可以保留本地状态更新，
-      // 不过依靠 subscription 更可靠且不冲突。
-      // setBooks(books.filter(b => b.url !== url))
+      await removeFromBookshelf(path)
+      // UI 更新由 subscription 处理
     }
   }
 
   // 批量删除
   const handleBatchRemove = async () => {
-    if (selectedUrls.size === 0) return
+    if (selectedPaths.size === 0) return
 
     const confirmed = await Dialog.confirm({
       title: '确认删除',
-      message: `确定要删除选中的 ${selectedUrls.size} 本书吗？`
+      message: `确定要删除选中的 ${selectedPaths.size} 本书吗？`
     })
 
     if (confirmed) {
-      const urls = Array.from(selectedUrls)
-      await batchRemoveFromBookshelf(urls)
+      const paths = Array.from(selectedPaths)
+      await batchRemoveFromBookshelf(paths)
       // UI 更新由 subscription 处理
-      setSelectedUrls(new Set())
+      setSelectedPaths(new Set())
       setEditMode(false)
     }
   }
 
   // 切换选中状态
-  const toggleSelect = (url: string) => {
-    const newSet = new Set(selectedUrls)
-    if (newSet.has(url)) {
-      newSet.delete(url)
+  const toggleSelect = (path: string) => {
+    const newSet = new Set(selectedPaths)
+    if (newSet.has(path)) {
+      newSet.delete(path)
     } else {
-      newSet.add(url)
+      newSet.add(path)
     }
-    setSelectedUrls(newSet)
+    setSelectedPaths(newSet)
   }
 
   // 全选/取消全选
   const toggleSelectAll = () => {
-    if (selectedUrls.size === books.length) {
-      setSelectedUrls(new Set())
+    if (selectedPaths.size === books.length) {
+      setSelectedPaths(new Set())
     } else {
-      setSelectedUrls(new Set(books.map(b => b.url)))
+      setSelectedPaths(new Set(books.map(b => b.path)))
     }
   }
 
@@ -337,7 +351,7 @@ export function HomeScreen() {
   // 退出编辑模式
   const exitEditMode = () => {
     setEditMode(false)
-    setSelectedUrls(new Set())
+    setSelectedPaths(new Set())
   }
 
   return (
@@ -355,7 +369,7 @@ export function HomeScreen() {
             </Menu>
           ),
           topBarTrailing: editMode ? (
-            <Button title={`删除(${selectedUrls.size})`} action={handleBatchRemove} disabled={selectedUrls.size === 0} />
+            <Button title={`删除(${selectedPaths.size})`} action={handleBatchRemove} disabled={selectedPaths.size === 0} />
           ) : (
             <HStack spacing={16}>
               <Button title="" systemImage={settings.viewMode === 'list' ? 'square.grid.2x2' : 'list.bullet'} action={toggleViewMode} />
@@ -433,7 +447,7 @@ export function HomeScreen() {
                     <Button title="编辑" action={() => setEditMode(true)} buttonStyle="borderless" />
                   </HStack>
                 ) : (
-                  <Button title={selectedUrls.size === books.length ? '取消全选' : '全选'} action={toggleSelectAll} />
+                  <Button title={selectedPaths.size === books.length ? '取消全选' : '全选'} action={toggleSelectAll} />
                 )}
               </HStack>
             </Section>
@@ -443,41 +457,32 @@ export function HomeScreen() {
               <Section>
                 {books.map(book =>
                   editMode ? (
-                    <Button key={book.url} action={() => toggleSelect(book.url)}>
+                    <Button key={book.path} action={() => toggleSelect(book.path)}>
                       <HStack>
-                        <Text>{selectedUrls.has(book.url) ? '☑️' : '⬜'}</Text>
-                        <BookListItem book={book} onRemove={() => handleRemoveBook(book.url)} />
+                        <Text>{selectedPaths.has(book.path) ? '☑️' : '⬜'}</Text>
+                        <BookListItem book={book} onRemove={() => handleRemoveBook(book.path)} />
                       </HStack>
                     </Button>
                   ) : (
-                    <NavigationLink key={book.url} destination={<BookDetailWrapper book={book} />}>
-                      <BookListItem book={book} onRemove={() => handleRemoveBook(book.url)} />
+                    <NavigationLink key={book.path} destination={<BookDetailWrapper book={book} />}>
+                      <BookListItem book={book} onRemove={() => handleRemoveBook(book.path)} />
                     </NavigationLink>
                   )
                 )}
               </Section>
             ) : (
               <ScrollView>
-                <LazyVGrid
-                  columns={[
-                    { size: { type: 'flexible' } },
-                    { size: { type: 'flexible' } },
-                    { size: { type: 'flexible' } },
-                    { size: { type: 'flexible' } },
-                    { size: { type: 'flexible' } },
-                    { size: { type: 'flexible' } }
-                  ]}
-                >
+                <LazyVGrid columns={[{ size: { type: 'adaptive', min: 90 } }]} spacing={12}>
                   {books.map(book =>
                     editMode ? (
-                      <Button key={book.url} action={() => toggleSelect(book.url)}>
+                      <Button key={book.path} action={() => toggleSelect(book.path)}>
                         <VStack>
-                          {selectedUrls.has(book.url) ? <Text>☑️</Text> : null}
+                          {selectedPaths.has(book.path) ? <Text>☑️</Text> : null}
                           <BookGridItem book={book} />
                         </VStack>
                       </Button>
                     ) : (
-                      <NavigationLink key={book.url} destination={<BookDetailWrapper book={book} />}>
+                      <NavigationLink key={book.path} destination={<BookDetailWrapper book={book} />}>
                         <BookGridItem book={book} />
                       </NavigationLink>
                     )

@@ -96,6 +96,12 @@ scripts/Reader/
     └── CommonSections.tsx # 通用 Section 组件
 ```
 
+## 📖 文档
+
+- [规则规范](scripts/Reader/docs/rule-spec.md) - UniversalRule 完整字段说明
+- [开发指南](scripts/Reader/docs/development.md) - 本地开发、调试和贡献
+- [书架设计](scripts/Reader/docs/bookshelf-enhancement-plan.md) - 书架功能设计方案
+
 ## 📄 许可证
 
 MIT
