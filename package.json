@@ -38,9 +38,5 @@
   "volta": {
     "node": "24.11.1",
     "pnpm": "10.25.0"
-  },
-  "dependencies": {
-    "cheerio": "^1.1.2",
-    "node-html-parser": "^7.0.1"
   }
 }
