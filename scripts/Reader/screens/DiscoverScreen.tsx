@@ -3,8 +3,8 @@
  * 显示书源的分类内容（热门、最新、分类等）
  */
 
-import { Button, List, Section, Text, VStack, HStack, Image, Spacer, useState, useEffect, NavigationLink, ScrollView } from 'scripting'
-import type { Rule, SearchItem, DiscoverItem } from '../types'
+import { Button, HStack, Image, List, NavigationLink, ScrollView, Section, Spacer, Text, VStack, useEffect, useState } from 'scripting'
+import type { DiscoverItem, Rule, SearchItem } from '../types'
 import { getDiscover } from '../services/ruleEngine'
 import { ChapterListScreen } from './ChapterListScreen'
 import { logger } from '../services/logger'
@@ -81,7 +81,7 @@ async function parseDiscoverUrl(discoverUrl: string): Promise<DiscoverCategory[]
     // 先加载空白页面，才能执行 JavaScript
     await controller.loadURL('about:blank')
 
-    let jsCode = trimmed.slice(4).trim()
+    const jsCode = trimmed.slice(4).trim()
 
     // 检查是否是 IIFE 表达式 (立即执行函数)
     // 格式: (() => { ... })() 或 (function() { ... })()

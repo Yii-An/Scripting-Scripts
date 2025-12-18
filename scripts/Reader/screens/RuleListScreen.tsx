@@ -3,10 +3,10 @@
  * 每个规则一个列表项，点击进入详情页选择搜索或发现
  */
 
-import { Button, Form, NavigationStack, Section, Text, TextField, VStack, HStack, Spacer, useState, useEffect, Image, NavigationLink } from 'scripting'
-import type { Rule } from '../types'
-import { UniversalContentType, UniversalContentTypeLabels } from '../types'
-import { loadRules, deleteRule, clearAllRules, parseRuleJson, addRule, importRules, updateRulesFromUrl } from '../services/ruleStorage'
+import { Button, Form, HStack, Image, NavigationLink, NavigationStack, Section, Spacer, Text, TextField, VStack, useEffect, useState } from 'scripting'
+import type { Rule, UniversalContentType } from '../types'
+import { UniversalContentTypeLabels } from '../types'
+import { addRule, clearAllRules, deleteRule, importRules, loadRules, parseRuleJson, updateRulesFromUrl } from '../services/ruleStorage'
 import { SearchScreen } from './SearchScreen'
 import { DiscoverScreen } from './DiscoverScreen'
 import { logger } from '../services/logger'

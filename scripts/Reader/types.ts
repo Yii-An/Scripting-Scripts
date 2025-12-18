@@ -32,27 +32,6 @@ export interface UniversalSearchRule {
   result: string
 }
 
-export interface UniversalDetailRule {
-  enabled?: boolean
-  url?: string
-  init?: string
-  name?: string
-  author?: string
-  cover?: string
-  description?: string
-  latestChapter?: string
-  wordCount?: string
-  tags?: string
-  tocUrl?: string
-  canRename?: boolean
-}
-
-export interface MultiRoadsConfig {
-  enabled: boolean
-  roads?: string
-  roadName?: string
-}
-
 export interface UniversalChapterRule {
   url?: string
   list: string
@@ -63,8 +42,6 @@ export interface UniversalChapterRule {
   nextUrl?: string
   isVip?: string
   isPay?: string
-  info?: string
-  multiRoads?: MultiRoadsConfig
 }
 
 export interface UniversalDiscoverRule {
@@ -82,22 +59,10 @@ export interface UniversalDiscoverRule {
   nextUrl?: string
 }
 
-export interface ContentReplaceRule {
-  pattern: string
-  replacement: string
-  isRegex?: boolean
-}
-
 export interface UniversalContentRule {
   url?: string
   items: string
   nextUrl?: string
-  decoder?: string
-  imageHeaders?: string
-  webView?: boolean
-  payAction?: string
-  sourceRegex?: string
-  replaceRules?: ContentReplaceRule[]
 }
 
 export interface UniversalRuleMeta {
@@ -121,13 +86,9 @@ export interface UniversalRule {
   sort?: number
   enabled?: boolean
   comment?: string
-  jsLib?: string
   contentType: UniversalContentType
   userAgent?: string
-  headers?: Record<string, string>
-  loadJs?: string
   search?: UniversalSearchRule
-  detail?: UniversalDetailRule
   chapter?: UniversalChapterRule
   discover?: UniversalDiscoverRule
   content?: UniversalContentRule
@@ -155,6 +116,7 @@ export interface SearchItem {
   author?: string
   chapter?: string
   description?: string
+  tags?: string
   url: string
 }
 
@@ -164,6 +126,8 @@ export interface ChapterItem {
   time?: string
   url: string
   isLocked?: boolean
+  isVip?: boolean
+  isPay?: boolean
 }
 
 export interface DiscoverItem {

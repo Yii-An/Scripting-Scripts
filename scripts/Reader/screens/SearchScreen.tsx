@@ -3,7 +3,7 @@
  * 根据规则搜索内容
  */
 
-import { Button, Form, Section, Text, TextField, VStack, HStack, Spacer, useState, Image, NavigationLink, ScrollView } from 'scripting'
+import { Button, Form, HStack, Image, NavigationLink, ScrollView, Section, Spacer, Text, TextField, VStack, useState } from 'scripting'
 import type { Rule, SearchItem } from '../types'
 import { search } from '../services/ruleEngine'
 import { ChapterListScreen } from './ChapterListScreen'

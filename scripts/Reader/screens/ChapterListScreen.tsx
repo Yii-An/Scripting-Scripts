@@ -1,9 +1,9 @@
-import { Button, Form, Section, Text, VStack, HStack, Spacer, useState, useEffect, useRef, Image, NavigationLink, ScrollView } from 'scripting'
-import type { Rule, SearchItem, ChapterItem } from '../types'
+import { Button, Form, HStack, Image, NavigationLink, ScrollView, Section, Spacer, Text, VStack, useEffect, useRef, useState } from 'scripting'
+import type { ChapterItem, Rule, SearchItem } from '../types'
 import { getChapterList } from '../services/ruleEngine'
 import { ReaderScreen } from './ReaderScreen'
 import { logger } from '../services/logger'
-import { addToBookshelf, isInBookshelf, getReadProgress, extractPath } from '../services/bookshelfStorage'
+import { addToBookshelf, extractPath, getReadProgress, isInBookshelf } from '../services/bookshelfStorage'
 
 type ChapterListScreenProps = {
   rule: Rule
@@ -80,7 +80,7 @@ export function ChapterListScreen({ rule, item }: ChapterListScreenProps) {
 
   // 检查书架状态（使用相对路径）
   const itemPath = extractPath(item.url)
-  
+
   useEffect(() => {
     isInBookshelf(itemPath).then(setInBookshelf)
     getReadProgress(itemPath, rule.host).then(progress => {

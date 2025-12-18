@@ -6,7 +6,7 @@
  * 不能使用 IIFE，因为 IIFE 内部的 return 只是函数返回，不是顶层 return
  */
 
-import type { Rule, SearchItem, ChapterItem } from '../types'
+import type { ChapterItem, Rule, SearchItem } from '../types'
 import { logger } from './logger'
 
 /**
@@ -148,6 +148,7 @@ interface SearchConfig {
   authorRule: string
   chapterRule: string
   descriptionRule: string
+  tagsRule: string
   urlRule: string
   host: string
 }
@@ -161,6 +162,8 @@ interface ChapterConfig {
   urlRule: string
   coverRule?: string
   timeRule?: string
+  isVipRule?: string
+  isPayRule?: string
   host: string
 }
 
@@ -236,21 +239,293 @@ export class WebAnalyzer {
   }> {
     logger.debug(`[WebAnalyzer] 提取搜索结果，列表选择器: ${config.listSelector}`)
     const listType = detectRuleType(config.listSelector)
-    const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
 
+    // JSONPath 规则：从页面 JSON 数据中提取
+    if (listType === 'json') {
+      return this.extractSearchResultsFromJson(config, cleanListSelector)
+    }
+
+    // @js: 规则：执行自定义 JavaScript 返回列表
+    if (listType === 'js') {
+      return this.extractSearchResultsWithJs(config, cleanListSelector)
+    }
+
+    // CSS / XPath 规则
+    return this.extractSearchResultsFromDom(config, cleanListSelector, listType === 'xpath')
+  }
+
+  /**
+   * 从 JSON 数据提取搜索结果 (JSONPath)
+   */
+  private async extractSearchResultsFromJson(
+    config: SearchConfig,
+    jsonPath: string
+  ): Promise<{ success: boolean; data?: SearchItem[]; error?: string; debug?: any }> {
+    logger.debug(`[WebAnalyzer] 使用 JSONPath 提取: ${jsonPath}`)
+
+    const script = `
+      try {
+        var host = ${JSON.stringify(config.host)};
+        var nameField = ${JSON.stringify(config.nameRule || 'name')};
+        var coverField = ${JSON.stringify(config.coverRule || 'cover')};
+        var authorField = ${JSON.stringify(config.authorRule || 'author')};
+        var chapterField = ${JSON.stringify(config.chapterRule || 'latestChapter')};
+        var descField = ${JSON.stringify(config.descriptionRule || 'description')};
+        var tagsField = ${JSON.stringify(config.tagsRule || 'tags')};
+        var urlField = ${JSON.stringify(config.urlRule || 'url')};
+        var jsonPath = ${JSON.stringify(jsonPath)};
+
+        // 获取页面 JSON 内容
+        var preElement = document.querySelector('pre');
+        var jsonText = preElement ? preElement.textContent || '' : document.body.innerText || '';
+        var jsonData = JSON.parse(jsonText);
+
+        // 简单 JSONPath 解析
+        function extractByPath(data, path) {
+          if (path.startsWith('$..')) {
+            var key = path.slice(3);
+            var results = [];
+            function findAll(obj) {
+              if (Array.isArray(obj)) {
+                obj.forEach(function(item) { findAll(item); });
+              } else if (obj && typeof obj === 'object') {
+                if (obj[key] !== undefined) results.push(obj[key]);
+                Object.keys(obj).forEach(function(k) { findAll(obj[k]); });
+              }
+            }
+            findAll(data);
+            return results;
+          } else if (path.startsWith('$[*].') || path.startsWith('$.')) {
+            var keyPath = path.startsWith('$[*].') ? path.slice(5) : path.slice(2);
+            var keys = keyPath.split('.');
+            var current = Array.isArray(data) ? data : [data];
+            for (var i = 0; i < keys.length - 1; i++) {
+              var newCurrent = [];
+              current.forEach(function(item) {
+                if (item && item[keys[i]]) {
+                  if (Array.isArray(item[keys[i]])) {
+                    newCurrent = newCurrent.concat(item[keys[i]]);
+                  } else {
+                    newCurrent.push(item[keys[i]]);
+                  }
+                }
+              });
+              current = newCurrent;
+            }
+            return current;
+          } else if (path.startsWith('$[')) {
+            // $[0].books 等形式
+            var match = path.match(/\\$\\[(\\d+)\\]\\.?(.*)/);
+            if (match) {
+              var idx = parseInt(match[1]);
+              var rest = match[2];
+              if (Array.isArray(data) && data[idx]) {
+                if (rest) {
+                  var keys = rest.split('.');
+                  var current = data[idx];
+                  for (var i = 0; i < keys.length; i++) {
+                    if (current && current[keys[i]] !== undefined) {
+                      current = current[keys[i]];
+                    } else {
+                      return [];
+                    }
+                  }
+                  return Array.isArray(current) ? current : [current];
+                }
+                return Array.isArray(data[idx]) ? data[idx] : [data[idx]];
+              }
+            }
+          }
+          return Array.isArray(data) ? data : [data];
+        }
+
+        // 构建完整 URL
+        function buildUrl(url) {
+          if (!url) return '';
+          if (typeof url !== 'string') return '';
+          if (url.startsWith('http://') || url.startsWith('https://')) return url;
+          if (url.startsWith('//')) return 'https:' + url;
+          if (url.startsWith('/')) return host.replace(/\\/$/, '') + url;
+          return host.replace(/\\/$/, '') + '/' + url;
+        }
+
+        // 获取对象字段值
+        function getField(obj, field) {
+          if (!obj || !field) return '';
+          // 支持点号分隔的路径
+          var keys = field.split('.');
+          var current = obj;
+          for (var i = 0; i < keys.length; i++) {
+            if (current && current[keys[i]] !== undefined) {
+              current = current[keys[i]];
+            } else {
+              return '';
+            }
+          }
+          return current || '';
+        }
+
+        var nodes = extractByPath(jsonData, jsonPath);
+        var items = [];
+
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (typeof node !== 'object') continue;
+
+          var name = getField(node, nameField);
+          var url = getField(node, urlField);
+
+          if (name || url) {
+            items.push({
+              name: String(name || ''),
+              cover: buildUrl(getField(node, coverField)),
+              author: String(getField(node, authorField) || ''),
+              chapter: String(getField(node, chapterField) || ''),
+              description: String(getField(node, descField) || ''),
+              tags: String(getField(node, tagsField) || ''),
+              url: buildUrl(url)
+            });
+          }
+        }
+
+        return JSON.stringify({
+          success: true,
+          data: items,
+          debug: { nodeCount: nodes.length, jsonPath: jsonPath, ruleType: 'json' }
+        });
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: 'JSONPath 解析失败: ' + e.message,
+          debug: { stack: e.stack, ruleType: 'json' }
+        });
+      }
+    `
+
+    const resultJson = await this.evaluate<string>(script)
+    if (!resultJson) {
+      return { success: false, error: 'evaluateJavaScript 返回空值', debug: { ruleType: 'json' } }
+    }
+
+    try {
+      return JSON.parse(resultJson)
+    } catch (e) {
+      return { success: false, error: `JSON 解析失败: ${e}`, debug: { raw: resultJson.substring(0, 500) } }
+    }
+  }
+
+  /**
+   * 使用自定义 JavaScript 提取搜索结果 (@js:)
+   */
+  private async extractSearchResultsWithJs(
+    config: SearchConfig,
+    jsCode: string
+  ): Promise<{ success: boolean; data?: SearchItem[]; error?: string; debug?: any }> {
+    logger.debug(`[WebAnalyzer] 使用 @js: 提取搜索结果`)
+
+    // 将 JS 代码的最后一行包装成 return 语句
+    const jsLines = jsCode.trim().split('\n')
+    const lastLine = jsLines[jsLines.length - 1].trim()
+    if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
+      const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
+      jsLines[jsLines.length - 1] = `return ${cleanLastLine};`
+    }
+    const wrappedJsCode = jsLines.join('\n')
+
+    const script = `
+      try {
+        var host = ${JSON.stringify(config.host)};
+        var result = document.documentElement.outerHTML;
+
+        // 构建完整 URL
+        function buildUrl(url) {
+          if (!url) return '';
+          if (typeof url !== 'string') return '';
+          if (url.startsWith('http://') || url.startsWith('https://')) return url;
+          if (url.startsWith('//')) return 'https:' + url;
+          if (url.startsWith('/')) return host.replace(/\\/$/, '') + url;
+          return host.replace(/\\/$/, '') + '/' + url;
+        }
+
+        // 执行用户代码，期望返回数组
+        var nodes = (function() {
+          ${wrappedJsCode}
+        })();
+
+        if (!Array.isArray(nodes)) {
+          nodes = nodes ? [nodes] : [];
+        }
+
+        // 转换为标准 SearchItem 格式
+        var items = [];
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (typeof node !== 'object') continue;
+
+          var name = node.name || node.title || '';
+          var url = node.url || node.link || node.href || '';
+
+          if (name || url) {
+            items.push({
+              name: String(name),
+              cover: buildUrl(node.cover || node.image || node.img || ''),
+              author: String(node.author || ''),
+              chapter: String(node.chapter || node.latestChapter || ''),
+              description: String(node.description || node.desc || node.intro || ''),
+              tags: String(node.tags || ''),
+              url: buildUrl(url)
+            });
+          }
+        }
+
+        return JSON.stringify({
+          success: true,
+          data: items,
+          debug: { nodeCount: nodes.length, ruleType: 'js' }
+        });
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: '@js: 执行失败: ' + e.message,
+          debug: { stack: e.stack, ruleType: 'js' }
+        });
+      }
+    `
+
+    const resultJson = await this.evaluate<string>(script)
+    if (!resultJson) {
+      return { success: false, error: 'evaluateJavaScript 返回空值', debug: { ruleType: 'js' } }
+    }
+
+    try {
+      return JSON.parse(resultJson)
+    } catch (e) {
+      return { success: false, error: `JSON 解析失败: ${e}`, debug: { raw: resultJson.substring(0, 500) } }
+    }
+  }
+
+  /**
+   * 从 DOM 提取搜索结果 (CSS/XPath)
+   */
+  private async extractSearchResultsFromDom(
+    config: SearchConfig,
+    selector: string,
+    isXPath: boolean
+  ): Promise<{ success: boolean; data?: SearchItem[]; error?: string; debug?: any }> {
     // 解析各字段的规则
     const nameRule = parseCssRule(config.nameRule)
     const coverRule = parseCssRule(config.coverRule)
     const authorRule = parseCssRule(config.authorRule)
     const chapterRule = parseCssRule(config.chapterRule)
     const descRule = parseCssRule(config.descriptionRule)
+    const tagsRule = parseCssRule(config.tagsRule)
     const urlRule = parseCssRule(config.urlRule)
 
     // 构建 JavaScript 脚本（顶层 return）
     const script = `
       try {
-        var listSelector = ${JSON.stringify(cleanListSelector)};
+        var listSelector = ${JSON.stringify(selector)};
         var isXPath = ${isXPath};
         var host = ${JSON.stringify(config.host)};
         
@@ -261,6 +536,7 @@ export class WebAnalyzer {
           author: ${JSON.stringify(authorRule)},
           chapter: ${JSON.stringify(chapterRule)},
           description: ${JSON.stringify(descRule)},
+          tags: ${JSON.stringify(tagsRule)},
           url: ${JSON.stringify(urlRule)}
         };
         
@@ -328,6 +604,7 @@ export class WebAnalyzer {
               author: getValue(node, rules.author),
               chapter: getValue(node, rules.chapter),
               description: getValue(node, rules.description),
+              tags: getValue(node, rules.tags),
               url: buildUrl(url)
             });
           }
@@ -338,7 +615,8 @@ export class WebAnalyzer {
           data: items,
           debug: {
             nodeCount: nodes.length,
-            bodyLength: document.body.innerHTML.length
+            bodyLength: document.body.innerHTML.length,
+            ruleType: isXPath ? 'xpath' : 'css'
           }
         });
       } catch (e) {
@@ -354,13 +632,14 @@ export class WebAnalyzer {
 
     // 解析后的规则配置（用于调试）
     const parsedRules = {
-      listSelector: cleanListSelector,
+      listSelector: selector,
       isXPath,
       name: nameRule,
       cover: coverRule,
       author: authorRule,
       chapter: chapterRule,
       description: descRule,
+      tags: tagsRule,
       url: urlRule
     }
 
@@ -398,17 +677,283 @@ export class WebAnalyzer {
   }> {
     logger.debug(`[WebAnalyzer] 提取章节列表，列表选择器: ${config.listSelector}`)
     const listType = detectRuleType(config.listSelector)
-    const isXPath = listType === 'xpath'
     const cleanListSelector = removeRulePrefix(config.listSelector)
 
+    // JSONPath 规则：从页面 JSON 数据中提取
+    if (listType === 'json') {
+      return this.extractChapterListFromJson(config, cleanListSelector)
+    }
+
+    // @js: 规则：执行自定义 JavaScript 返回列表
+    if (listType === 'js') {
+      return this.extractChapterListWithJs(config, cleanListSelector)
+    }
+
+    // CSS / XPath 规则
+    return this.extractChapterListFromDom(config, cleanListSelector, listType === 'xpath')
+  }
+
+  /**
+   * 从 JSON 数据提取章节列表 (JSONPath)
+   */
+  private async extractChapterListFromJson(
+    config: ChapterConfig,
+    jsonPath: string
+  ): Promise<{ success: boolean; data?: ChapterItem[]; error?: string; debug?: any }> {
+    logger.debug(`[WebAnalyzer] 使用 JSONPath 提取章节: ${jsonPath}`)
+
+    const script = `
+      try {
+        var host = ${JSON.stringify(config.host)};
+        var nameField = ${JSON.stringify(config.nameRule || 'name')};
+        var urlField = ${JSON.stringify(config.urlRule || 'url')};
+        var coverField = ${JSON.stringify(config.coverRule || 'cover')};
+        var timeField = ${JSON.stringify(config.timeRule || 'time')};
+        var jsonPath = ${JSON.stringify(jsonPath)};
+
+        // 获取页面 JSON 内容
+        var preElement = document.querySelector('pre');
+        var jsonText = preElement ? preElement.textContent || '' : document.body.innerText || '';
+        var jsonData = JSON.parse(jsonText);
+
+        // 简单 JSONPath 解析
+        function extractByPath(data, path) {
+          if (path.startsWith('$..')) {
+            var key = path.slice(3);
+            var results = [];
+            function findAll(obj) {
+              if (Array.isArray(obj)) {
+                obj.forEach(function(item) { findAll(item); });
+              } else if (obj && typeof obj === 'object') {
+                if (obj[key] !== undefined) results.push(obj[key]);
+                Object.keys(obj).forEach(function(k) { findAll(obj[k]); });
+              }
+            }
+            findAll(data);
+            return results;
+          } else if (path.startsWith('$[*].') || path.startsWith('$.')) {
+            var keyPath = path.startsWith('$[*].') ? path.slice(5) : path.slice(2);
+            var keys = keyPath.split('.');
+            var current = Array.isArray(data) ? data : [data];
+            for (var i = 0; i < keys.length - 1; i++) {
+              var newCurrent = [];
+              current.forEach(function(item) {
+                if (item && item[keys[i]]) {
+                  if (Array.isArray(item[keys[i]])) {
+                    newCurrent = newCurrent.concat(item[keys[i]]);
+                  } else {
+                    newCurrent.push(item[keys[i]]);
+                  }
+                }
+              });
+              current = newCurrent;
+            }
+            return current;
+          } else if (path.startsWith('$[')) {
+            var match = path.match(/\\$\\[(\\d+)\\]\\.?(.*)/);
+            if (match) {
+              var idx = parseInt(match[1]);
+              var rest = match[2];
+              if (Array.isArray(data) && data[idx]) {
+                if (rest) {
+                  var keys = rest.split('.');
+                  var current = data[idx];
+                  for (var i = 0; i < keys.length; i++) {
+                    if (current && current[keys[i]] !== undefined) {
+                      current = current[keys[i]];
+                    } else {
+                      return [];
+                    }
+                  }
+                  return Array.isArray(current) ? current : [current];
+                }
+                return Array.isArray(data[idx]) ? data[idx] : [data[idx]];
+              }
+            }
+          }
+          return Array.isArray(data) ? data : [data];
+        }
+
+        // 构建完整 URL
+        function buildUrl(url) {
+          if (!url) return '';
+          if (typeof url !== 'string') return '';
+          if (url.startsWith('http://') || url.startsWith('https://')) return url;
+          if (url.startsWith('//')) return 'https:' + url;
+          if (url.startsWith('/')) return host.replace(/\\/$/, '') + url;
+          return host.replace(/\\/$/, '') + '/' + url;
+        }
+
+        // 获取对象字段值
+        function getField(obj, field) {
+          if (!obj || !field) return '';
+          var keys = field.split('.');
+          var current = obj;
+          for (var i = 0; i < keys.length; i++) {
+            if (current && current[keys[i]] !== undefined) {
+              current = current[keys[i]];
+            } else {
+              return '';
+            }
+          }
+          return current || '';
+        }
+
+        var nodes = extractByPath(jsonData, jsonPath);
+        var items = [];
+
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (typeof node !== 'object') continue;
+
+          var name = getField(node, nameField);
+          var url = getField(node, urlField);
+
+          if (name || url) {
+            items.push({
+              name: String(name || ''),
+              url: buildUrl(url),
+              cover: buildUrl(getField(node, coverField)),
+              time: String(getField(node, timeField) || ''),
+              isVip: !!node.isVip,
+              isPay: !!node.isPay
+            });
+          }
+        }
+
+        return JSON.stringify({
+          success: true,
+          data: items,
+          debug: { nodeCount: nodes.length, jsonPath: jsonPath, ruleType: 'json' }
+        });
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: 'JSONPath 解析失败: ' + e.message,
+          debug: { stack: e.stack, ruleType: 'json' }
+        });
+      }
+    `
+
+    const resultJson = await this.evaluate<string>(script)
+    if (!resultJson) {
+      return { success: false, error: 'evaluateJavaScript 返回空值', debug: { ruleType: 'json' } }
+    }
+
+    try {
+      return JSON.parse(resultJson)
+    } catch (e) {
+      return { success: false, error: `JSON 解析失败: ${e}`, debug: { raw: resultJson.substring(0, 500) } }
+    }
+  }
+
+  /**
+   * 使用自定义 JavaScript 提取章节列表 (@js:)
+   */
+  private async extractChapterListWithJs(
+    config: ChapterConfig,
+    jsCode: string
+  ): Promise<{ success: boolean; data?: ChapterItem[]; error?: string; debug?: any }> {
+    logger.debug(`[WebAnalyzer] 使用 @js: 提取章节列表`)
+
+    // 将 JS 代码的最后一行包装成 return 语句
+    const jsLines = jsCode.trim().split('\n')
+    const lastLine = jsLines[jsLines.length - 1].trim()
+    if (lastLine && !lastLine.startsWith('return ') && !lastLine.startsWith('return;')) {
+      const cleanLastLine = lastLine.endsWith(';') ? lastLine.slice(0, -1) : lastLine
+      jsLines[jsLines.length - 1] = `return ${cleanLastLine};`
+    }
+    const wrappedJsCode = jsLines.join('\n')
+
+    const script = `
+      try {
+        var host = ${JSON.stringify(config.host)};
+        var result = document.documentElement.outerHTML;
+
+        // 构建完整 URL
+        function buildUrl(url) {
+          if (!url) return '';
+          if (typeof url !== 'string') return '';
+          if (url.startsWith('http://') || url.startsWith('https://')) return url;
+          if (url.startsWith('//')) return 'https:' + url;
+          if (url.startsWith('/')) return host.replace(/\\/$/, '') + url;
+          return host.replace(/\\/$/, '') + '/' + url;
+        }
+
+        // 执行用户代码，期望返回数组
+        var nodes = (function() {
+          ${wrappedJsCode}
+        })();
+
+        if (!Array.isArray(nodes)) {
+          nodes = nodes ? [nodes] : [];
+        }
+
+        // 转换为标准 ChapterItem 格式
+        var items = [];
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (typeof node !== 'object') continue;
+
+          var name = node.name || node.title || '';
+          var url = node.url || node.link || node.href || '';
+
+          if (name || url) {
+            items.push({
+              name: String(name),
+              url: buildUrl(url),
+              cover: buildUrl(node.cover || node.image || ''),
+              time: String(node.time || node.updateTime || ''),
+              isVip: !!node.isVip,
+              isPay: !!node.isPay
+            });
+          }
+        }
+
+        return JSON.stringify({
+          success: true,
+          data: items,
+          debug: { nodeCount: nodes.length, ruleType: 'js' }
+        });
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: '@js: 执行失败: ' + e.message,
+          debug: { stack: e.stack, ruleType: 'js' }
+        });
+      }
+    `
+
+    const resultJson = await this.evaluate<string>(script)
+    if (!resultJson) {
+      return { success: false, error: 'evaluateJavaScript 返回空值', debug: { ruleType: 'js' } }
+    }
+
+    try {
+      return JSON.parse(resultJson)
+    } catch (e) {
+      return { success: false, error: `JSON 解析失败: ${e}`, debug: { raw: resultJson.substring(0, 500) } }
+    }
+  }
+
+  /**
+   * 从 DOM 提取章节列表 (CSS/XPath)
+   */
+  private async extractChapterListFromDom(
+    config: ChapterConfig,
+    selector: string,
+    isXPath: boolean
+  ): Promise<{ success: boolean; data?: ChapterItem[]; error?: string; debug?: any }> {
     const nameRule = parseCssRule(config.nameRule)
     const urlRule = parseCssRule(config.urlRule)
     const coverRule = parseCssRule(config.coverRule || '')
     const timeRule = parseCssRule(config.timeRule || '')
+    const isVipRule = parseCssRule(config.isVipRule || '')
+    const isPayRule = parseCssRule(config.isPayRule || '')
 
     const script = `
       try {
-        var listSelector = ${JSON.stringify(cleanListSelector)};
+        var listSelector = ${JSON.stringify(selector)};
         var isXPath = ${isXPath};
         var host = ${JSON.stringify(config.host)};
         
@@ -416,7 +961,9 @@ export class WebAnalyzer {
           name: ${JSON.stringify(nameRule)},
           url: ${JSON.stringify(urlRule)},
           cover: ${JSON.stringify(coverRule)},
-          time: ${JSON.stringify(timeRule)}
+          time: ${JSON.stringify(timeRule)},
+          isVip: ${JSON.stringify(isVipRule)},
+          isPay: ${JSON.stringify(isPayRule)}
         };
         
         var nodes = [];
@@ -471,11 +1018,17 @@ export class WebAnalyzer {
           var url = getValue(node, rules.url);
           
           if (name || url) {
+            // isVip/isPay: 如果选择器匹配到元素，则为 true
+            var vipValue = getValue(node, rules.isVip);
+            var payValue = getValue(node, rules.isPay);
+            
             items.push({
               name: name,
               url: buildUrl(url),
               cover: buildUrl(getValue(node, rules.cover)),
-              time: getValue(node, rules.time)
+              time: getValue(node, rules.time),
+              isVip: !!vipValue,
+              isPay: !!payValue
             });
           }
         }
@@ -483,7 +1036,7 @@ export class WebAnalyzer {
         return JSON.stringify({
           success: true,
           data: items,
-          debug: { nodeCount: nodes.length }
+          debug: { nodeCount: nodes.length, ruleType: isXPath ? 'xpath' : 'css' }
         });
       } catch (e) {
         return JSON.stringify({
@@ -497,12 +1050,14 @@ export class WebAnalyzer {
 
     // 解析后的规则配置（用于调试）
     const parsedRules = {
-      listSelector: cleanListSelector,
+      listSelector: selector,
       isXPath,
       name: nameRule,
       url: urlRule,
       cover: coverRule,
-      time: timeRule
+      time: timeRule,
+      isVip: isVipRule,
+      isPay: isPayRule
     }
 
     if (!resultJson) {

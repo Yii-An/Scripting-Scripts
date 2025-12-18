@@ -3,8 +3,9 @@
  * 管理书架和阅读器相关设置
  */
 
-import { Form, Section, Text, VStack, HStack, Toggle, Stepper, Button, Spacer, useState, useEffect } from 'scripting'
-import { BookshelfSettings, loadSettings, saveSettings, isUsingiCloud } from '../services/bookshelfStorage'
+import { Button, Form, HStack, Section, Spacer, Stepper, Text, Toggle, VStack, useEffect, useState } from 'scripting'
+import type { BookshelfSettings } from '../services/bookshelfStorage'
+import { isUsingiCloud, loadSettings, saveSettings } from '../services/bookshelfStorage'
 import { logger } from '../services/logger'
 
 export function SettingsScreen() {

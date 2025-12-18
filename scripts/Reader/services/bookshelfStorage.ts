@@ -3,7 +3,7 @@
  * 支持 iCloud 同步，提供书籍收藏、阅读进度、更新检测等功能
  */
 
-import type { SearchItem, Rule } from '../types'
+import type { Rule, SearchItem } from '../types'
 import { logger } from './logger'
 import { getChapterList } from './ruleEngine'
 import { getRule } from './ruleStorage'
@@ -72,20 +72,20 @@ export type SortBy = 'lastRead' | 'addedAt' | 'name'
  */
 export function extractPath(url: string): string {
   if (!url) return ''
-  
+
   // 如果已经是相对路径，直接返回
   if (url.startsWith('/') && !url.startsWith('//')) {
     return url
   }
-  
+
   // 使用正则提取路径部分（不依赖 URL API）
   // 匹配 protocol://host 部分并移除
-  const match = url.match(/^(?:https?:)?\/\/[^\/]+(.*)$/)
+  const match = url.match(/^(?:https?:)?\/\/[^/]+(.*)$/)
   if (match) {
     const path = match[1]
     return path || '/'
   }
-  
+
   // 如果不是标准 URL 格式，假设是相对路径
   return url.startsWith('/') ? url : `/${url}`
 }
@@ -332,7 +332,7 @@ export async function saveBookshelf(items: BookshelfItem[]): Promise<boolean> {
 export async function addToBookshelf(item: SearchItem, ruleId: string, ruleName: string): Promise<boolean> {
   logger.info(`正在添加书籍: ${item.name}`)
   const itemPath = extractPath(item.url)
-  
+
   const result = await accessBookshelf(async books => {
     // 检查是否已存在（按 path + ruleId 判断）
     const exists = books.some(b => b.path === itemPath && b.ruleId === ruleId)
@@ -446,7 +446,10 @@ export async function updateReadProgress(bookPath: string, chapterName: string, 
  * @param bookPath 书籍的相对路径
  * @param host 规则的 host，用于拼接完整 URL（可选）
  */
-export async function getReadProgress(bookPath: string, host?: string): Promise<{
+export async function getReadProgress(
+  bookPath: string,
+  host?: string
+): Promise<{
   chapterName?: string
   chapterIndex?: number
   chapterPath?: string

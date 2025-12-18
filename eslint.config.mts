@@ -4,7 +4,7 @@ import configPrettier from 'eslint-config-prettier'
 import pluginPrettier from 'eslint-plugin-prettier'
 import tseslint from 'typescript-eslint'
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+ 
 import prettierRule from './prettier.config.mts'
 
 export default [

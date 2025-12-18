@@ -3,12 +3,12 @@
  * 显示正文内容，支持上下章切换
  */
 
-import { Button, Form, Section, Text, VStack, HStack, ZStack, Spacer, useState, useEffect, ScrollView, Image, GeometryReader } from 'scripting'
-import type { Rule, ChapterItem } from '../types'
+import { Button, Form, GeometryReader, HStack, Image, ScrollView, Section, Spacer, Text, VStack, ZStack, useEffect, useState } from 'scripting'
+import type { ChapterItem, Rule } from '../types'
 import { getContent } from '../services/ruleEngine'
 import { LoadingSection } from '../components/CommonSections'
 import { logger } from '../services/logger'
-import { updateReadProgress, isInBookshelf, extractPath } from '../services/bookshelfStorage'
+import { extractPath, isInBookshelf, updateReadProgress } from '../services/bookshelfStorage'
 
 type ReaderScreenProps = {
   rule: Rule
@@ -76,7 +76,7 @@ export function ReaderScreen({ rule, chapter, bookName, bookUrl, chapters, curre
 
   // 更新阅读进度（当内容加载成功时）
   const bookPath = extractPath(bookUrl)
-  
+
   useEffect(() => {
     if (content.length > 0 && !loading) {
       isInBookshelf(bookPath).then(inShelf => {

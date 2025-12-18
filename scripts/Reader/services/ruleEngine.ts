@@ -4,7 +4,7 @@
  * 所有解析在 WebView 中执行，使用浏览器原生 API
  */
 
-import type { Rule, SearchItem, ChapterItem, RuleResult } from '../types'
+import type { ChapterItem, Rule, RuleResult, SearchItem } from '../types'
 import { WebAnalyzer, buildFullUrl } from './webAnalyzer'
 import { logger } from './logger'
 
@@ -63,8 +63,7 @@ function formatContentRules(rule: Rule): string {
     `【正文内容规则配置】`,
     `content.url: ${ct?.url || '(未配置)'}`,
     `content.items: ${ct?.items || '(未配置)'}`,
-    `content.nextUrl: ${ct?.nextUrl || '(未配置)'}`,
-    `content.decoder: ${ct?.decoder || '(未配置)'}`
+    `content.nextUrl: ${ct?.nextUrl || '(未配置)'}`
   ].join('\n')
 }
 
@@ -208,6 +207,7 @@ export async function search(rule: Rule, keyword: string, onProgress?: ProgressC
       authorRule: rule.search.author || '',
       chapterRule: rule.search.latestChapter || '',
       descriptionRule: rule.search.description || '',
+      tagsRule: rule.search.tags || '',
       urlRule: rule.search.result || 'a@href',
       host: rule.host
     })
@@ -252,6 +252,7 @@ export async function search(rule: Rule, keyword: string, onProgress?: ProgressC
 export async function getChapterList(
   rule: Rule,
   url: string,
+  page: number = 1,
   onProgress?: (message: string) => void
 ): Promise<RuleResult<ChapterItem[]> & { nextUrl?: string }> {
   const controller = new WebViewController()
@@ -262,7 +263,7 @@ export async function getChapterList(
 
   try {
     // 输出规则配置信息
-    onProgress?.(`【章节列表页面】\n接收参数: url=${url}\n\n${formatChapterRules(rule)}`)
+    onProgress?.(`【章节列表页面】\n接收参数: url=${url}, page=${page}\n\n${formatChapterRules(rule)}`)
 
     // 检查 URL 是否为空
     if (!url || !url.trim()) {
@@ -272,7 +273,7 @@ export async function getChapterList(
 
     // 构建章节页 URL
     const chapterPageUrl = rule.chapter?.url
-      ? buildFullUrl(rule.chapter.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
+      ? buildFullUrl(rule.chapter.url.replace(/\$result\b|\{\{result\}\}/g, url).replace(/\$page\b|\{\{page\}\}/g, String(page)), rule.host)
       : buildFullUrl(url, rule.host)
 
     logger.request(chapterPageUrl)
@@ -311,6 +312,8 @@ export async function getChapterList(
       urlRule: rule.chapter.result || 'a@href',
       coverRule: rule.chapter.cover,
       timeRule: rule.chapter.time,
+      isVipRule: rule.chapter.isVip,
+      isPayRule: rule.chapter.isPay,
       host: rule.host
     })
 
@@ -345,7 +348,12 @@ export async function getChapterList(
 /**
  * 获取正文内容
  */
-export async function getContent(rule: Rule, url: string, onProgress?: (message: string) => void): Promise<RuleResult<string[]> & { nextUrl?: string }> {
+export async function getContent(
+  rule: Rule,
+  url: string,
+  page: number = 1,
+  onProgress?: (message: string) => void
+): Promise<RuleResult<string[]> & { nextUrl?: string }> {
   const controller = new WebViewController()
 
   // 设置日志上下文
@@ -354,11 +362,11 @@ export async function getContent(rule: Rule, url: string, onProgress?: (message:
 
   try {
     // 输出规则配置信息
-    onProgress?.(`【正文内容页面】\n接收参数: url=${url}\n\n${formatContentRules(rule)}`)
+    onProgress?.(`【正文内容页面】\n接收参数: url=${url}, page=${page}\n\n${formatContentRules(rule)}`)
 
     // 构建正文 URL
     const contentPageUrl = rule.content?.url
-      ? buildFullUrl(rule.content.url.replace(/\$result\b|\{\{result\}\}/g, url), rule.host)
+      ? buildFullUrl(rule.content.url.replace(/\$result\b|\{\{result\}\}/g, url).replace(/\$page\b|\{\{page\}\}/g, String(page)), rule.host)
       : buildFullUrl(url, rule.host)
 
     logger.request(contentPageUrl)
@@ -466,7 +474,7 @@ export async function getDiscover(rule: Rule, discoverUrl: string, page: number 
 
   try {
     // 替换页码变量
-    let processedUrl = discoverUrl.replace(/\$page\b/g, String(page)).replace(/\{\{page\}\}/g, String(page))
+    const processedUrl = discoverUrl.replace(/\$page\b/g, String(page)).replace(/\{\{page\}\}/g, String(page))
 
     // 构建发现页 URL
     const fullUrl = buildFullUrl(processedUrl, rule.host)
@@ -507,6 +515,7 @@ export async function getDiscover(rule: Rule, discoverUrl: string, page: number 
       authorRule: rule.discover.author || '',
       chapterRule: rule.discover.latestChapter || '',
       descriptionRule: rule.discover.description || '',
+      tagsRule: rule.discover.tags || '',
       urlRule: rule.discover.result || 'a@href',
       host: rule.host
     })

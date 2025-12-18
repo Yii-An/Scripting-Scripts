@@ -6,20 +6,20 @@
 import {
   Button,
   Form,
-  NavigationStack,
+  GridItem,
+  HStack,
+  Image,
+  LazyVGrid,
+  Menu,
   NavigationLink,
+  NavigationStack,
+  ScrollView,
   Section,
+  Spacer,
   Text,
   VStack,
-  HStack,
-  LazyVGrid,
-  GridItem,
-  Image,
-  Spacer,
-  useState,
   useEffect,
-  Menu,
-  ScrollView
+  useState
 } from 'scripting'
 import type { Rule } from '../types'
 import { ChapterListScreen } from './ChapterListScreen'
@@ -27,23 +27,20 @@ import { RuleListScreen } from './RuleListScreen'
 import { getRule } from '../services/ruleStorage'
 import { logger } from '../services/logger'
 import { SettingsScreen } from './SettingsScreen'
+import type { BookshelfItem, BookshelfSettings, SortBy, UpdateCheckProgress } from '../services/bookshelfStorage'
 import {
-  BookshelfItem,
-  BookshelfSettings,
-  SortBy,
-  loadBookshelf,
-  saveBookshelf,
-  removeFromBookshelf,
   batchRemoveFromBookshelf,
-  sortBookshelf,
-  loadSettings,
-  updateSetting,
-  isUsingiCloud,
+  buildUrl,
   checkBooksUpdate,
+  isUsingiCloud,
+  loadBookshelf,
+  loadSettings,
+  removeFromBookshelf,
+  saveBookshelf,
   shouldAutoCheckUpdate,
+  sortBookshelf,
   subscribeToBookshelfUpdates,
-  UpdateCheckProgress,
-  buildUrl
+  updateSetting
 } from '../services/bookshelfStorage'
 
 // ============================================================
@@ -120,12 +117,18 @@ function BookListItem({ book, onRemove }: { book: BookshelfItem; onRemove: () =>
           {book.hasUpdate ? (
             book.isReorganized ? (
               <HStack spacing={2}>
-                <Text foregroundStyle="orange" font="caption2">🔄 有变化</Text>
+                <Text foregroundStyle="orange" font="caption2">
+                  🔄 有变化
+                </Text>
               </HStack>
             ) : book.updateCount && book.updateCount > 0 ? (
-              <Text foregroundStyle="red" font="caption">+{book.updateCount}</Text>
+              <Text foregroundStyle="red" font="caption">
+                +{book.updateCount}
+              </Text>
             ) : (
-              <Text foregroundStyle="red" font="caption">●</Text>
+              <Text foregroundStyle="red" font="caption">
+                ●
+              </Text>
             )
           ) : null}
         </HStack>
@@ -169,11 +172,17 @@ function BookGridItem({ book }: { book: BookshelfItem }) {
           </Text>
           {book.hasUpdate ? (
             book.isReorganized ? (
-              <Text foregroundStyle="orange" font="caption2">🔄</Text>
+              <Text foregroundStyle="orange" font="caption2">
+                🔄
+              </Text>
             ) : book.updateCount && book.updateCount > 0 ? (
-              <Text foregroundStyle="red" font="caption2">+{book.updateCount}</Text>
+              <Text foregroundStyle="red" font="caption2">
+                +{book.updateCount}
+              </Text>
             ) : (
-              <Text foregroundStyle="red" font="caption2">●</Text>
+              <Text foregroundStyle="red" font="caption2">
+                ●
+              </Text>
             )
           ) : null}
         </HStack>
