@@ -6,7 +6,7 @@
 import { Button, Form, HStack, Image, NavigationLink, NavigationStack, Section, Spacer, Text, TextField, VStack, useEffect, useState } from 'scripting'
 import type { Rule, UniversalContentType } from '../types'
 import { UniversalContentTypeLabels } from '../types'
-import { addRule, clearAllRules, deleteRule, importRules, loadRules, parseRuleJson, updateRulesFromUrl } from '../services/ruleStorage'
+import { addRule, clearAllRules, deleteRule, exportRule, importRules, loadRules, parseRuleJson, updateRulesFromUrl } from '../services/ruleStorage'
 import { SearchScreen } from './SearchScreen'
 import { DiscoverScreen } from './DiscoverScreen'
 import { logger } from '../services/logger'
@@ -22,6 +22,12 @@ function getContentTypeLabel(type: UniversalContentType): string {
  * 规则详情页 - 选择搜索或发现
  */
 function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Promise<void> }) {
+  const handleCopyRule = async () => {
+    const json = exportRule(rule)
+    await Pasteboard.setString(json)
+    await Dialog.alert({ title: '已复制', message: '书源 JSON 已复制到剪贴板' })
+  }
+
   return (
     <Form navigationTitle={rule.name}>
       {/* 规则信息 */}
@@ -76,6 +82,7 @@ function RuleDetailScreen({ rule, onDelete }: { rule: Rule; onDelete: () => Prom
 
       {/* 操作 */}
       <Section>
+        <Button title="复制书源" action={handleCopyRule} />
         <Button title="删除此书源" action={onDelete} foregroundStyle="red" />
       </Section>
     </Form>

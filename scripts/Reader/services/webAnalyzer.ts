@@ -95,8 +95,8 @@ function parseCssRule(rule: string): ParsedRule {
     }
   }
 
-  // 简写规则：text, html, src, href, innerHtml, outerHtml 直接作为属性
-  const shorthandAttrs = ['text', 'html', 'src', 'href', 'innerHtml', 'outerHtml', 'textContent']
+  // 简写规则：text, html, src, href, innerHtml, outerHtml, textNodes 直接作为属性
+  const shorthandAttrs = ['text', 'html', 'src', 'href', 'innerHtml', 'outerHtml', 'textContent', 'textNodes']
   if (shorthandAttrs.includes(content)) {
     return {
       selector: '',
@@ -1230,15 +1230,76 @@ export class WebAnalyzer {
           nodes = Array.from(document.querySelectorAll(selector));
         }
         
+        // 辅助函数：从 HTML 元素提取保持段落格式的文本（类似 legado 的 textNodes 实现）
+        function extractTextNodes(element) {
+          var parts = [];
+          var childNodes = element.childNodes;
+          
+          for (var j = 0; j < childNodes.length; j++) {
+            var child = childNodes[j];
+            
+            if (child.nodeType === 3) {
+              // 文本节点 (Node.TEXT_NODE)
+              var text = child.textContent.trim();
+              if (text) {
+                parts.push(text);
+              }
+            } else if (child.nodeType === 1) {
+              // 元素节点 (Node.ELEMENT_NODE)
+              var tagName = child.tagName.toLowerCase();
+              
+              if (tagName === 'br') {
+                // br 标签表示换行
+                parts.push('\n');
+              } else if (tagName === 'p') {
+                // p 标签：段落，递归提取内容后添加段落分隔
+                var pText = extractTextNodes(child).trim();
+                if (pText) {
+                  parts.push('\n' + pText + '\n');
+                }
+              } else if (tagName === 'div') {
+                // div 标签：块级元素，递归提取内容后添加换行
+                var divText = extractTextNodes(child).trim();
+                if (divText) {
+                  parts.push('\n' + divText);
+                }
+              } else if (tagName === 'script' || tagName === 'style') {
+                // 忽略 script 和 style 标签
+              } else {
+                // 其他元素：递归提取文本
+                var innerText = extractTextNodes(child);
+                if (innerText) {
+                  parts.push(innerText);
+                }
+              }
+            }
+          }
+          
+          // 合并相邻的换行符，最多保留两个连续换行
+          var result = parts.join('');
+          result = result.replace(/\n{3,}/g, '\n\n');
+          return result;
+        }
+        
         var items = [];
         for (var i = 0; i < nodes.length; i++) {
           var node = nodes[i];
           var value = '';
-          if (attr === 'text') value = (node.textContent || '').trim();
-          else if (attr === 'html' || attr === 'innerHtml') value = node.innerHTML || '';
-          else if (attr === 'outerHtml') value = node.outerHTML || '';
-          else if (attr === 'src' || attr === 'href') value = node.getAttribute(attr) || '';
-          else value = node.getAttribute(attr) || (node.textContent || '').trim();
+          
+          if (attr === 'textNodes') {
+            // textNodes: 保持段落格式的文本提取（类似 legado）
+            value = extractTextNodes(node).trim();
+          } else if (attr === 'text') {
+            value = (node.textContent || '').trim();
+          } else if (attr === 'html' || attr === 'innerHtml') {
+            value = node.innerHTML || '';
+          } else if (attr === 'outerHtml') {
+            value = node.outerHTML || '';
+          } else if (attr === 'src' || attr === 'href') {
+            value = node.getAttribute(attr) || '';
+          } else {
+            value = node.getAttribute(attr) || (node.textContent || '').trim();
+          }
           
           if (value) items.push(value);
         }

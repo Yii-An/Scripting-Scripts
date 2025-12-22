@@ -6,15 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository contains scripts for the **Scripting** iOS app (by Thom Fang). Scripts are self-contained mini-apps that run within the Scripting app environment. The main script is "Reader" - a web content reader that uses configurable rules to extract and display content from websites.
 
+## Environment Requirements
+
+- Node.js 24+
+- pnpm 10+
+- [Scripting](https://apps.apple.com/app/id1528069225) iOS/Mac App
+
 ## Development Commands
 
 ```bash
-pnpm watch          # Watch files and sync to iCloud for Scripting app
 pnpm serve          # Start scripting-cli dev server (with Bonjour)
+pnpm watch          # Watch files and sync to iCloud for Scripting app
+pnpm type-check     # TypeScript type checking
 pnpm lint           # Run ESLint with auto-fix
 pnpm lint:check     # Run ESLint without fixing
 pnpm format         # Format code with Prettier
-pnpm type-check     # TypeScript type checking
 pnpm code-quality   # Run lint + format + type-check
 ```
 
@@ -40,12 +46,15 @@ Each script is a folder in `scripts/` containing:
 ```
 screens/          # UI screens (HomeScreen, ChapterListScreen, SearchScreen, etc.)
 services/         # Business logic
-  ├── ruleEngine.ts    # Executes rules using WebViewController
-  ├── webAnalyzer.ts   # CSS/XPath selector parsing in WebView
-  ├── ruleStorage.ts   # Persists rules to FileManager
-  └── ruleParser.ts    # Rule format parsing
+  ├── ruleEngine.ts       # Executes rules using WebViewController
+  ├── ruleParser.ts       # Rule expression parsing
+  ├── ruleStorage.ts      # Persists rules to FileManager
+  ├── bookshelfStorage.ts # Bookshelf/favorites persistence
+  ├── webAnalyzer.ts      # CSS/XPath selector parsing in WebView
+  └── logger.ts           # Logging service for debugging
 components/       # Reusable UI components
 types.ts          # TypeScript type definitions (Rule, SearchItem, ChapterItem, etc.)
+docs/             # Documentation (rule-spec.md, development.md)
 ```
 
 ## Critical Technical Details
@@ -79,3 +88,13 @@ Attribute extraction: `selector@attr` (e.g., `a@href`, `img@src`, `div@text`)
 
 ### Type Definitions
 The `dts/scripting.d.ts` file contains all framework type definitions. Global types like `WebViewController`, `FileManager`, `Keychain`, and `Dialog` are available without imports.
+
+### Debugging
+Use the logger service for debugging:
+```typescript
+import { logger } from './services/logger'
+
+logger.info('信息日志')
+logger.debug('调试日志')
+logger.error('错误日志', error)
+```
