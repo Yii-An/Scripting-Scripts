@@ -29,6 +29,10 @@
  * 正则替换: rule##pattern##replacement
  *
  * 索引切片: selector[0], selector[-1], selector[1:5], selector[::2]
+ *
+ * 变量指令:
+ * - @put:{key:rule} 可作为表达式的后置指令使用（以空格分隔），用于“保留原返回值 + 存储变量”。
+ *   例如: a@href @put:{bookId:a@data-id}
  */
 export type Expr = string
 
@@ -452,7 +456,7 @@ export interface Source {
   /** 全局 JS 库代码 (可在 @js: 规则中调用) */
   jsLib?: string
 
-  /** 全局变量 (可通过 {{varName}} 或 {{@get:varName}} 引用) */
+  /** 全局变量 (可通过 {{varName}} 直接引用) */
   vars?: Record<string, string>
 
   // ===== 功能模块 =====

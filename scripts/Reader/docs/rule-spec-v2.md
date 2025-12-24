@@ -254,18 +254,18 @@ interface RequestConfig {
   /** URL 模板，支持变量插值 */
   url: string
   
-  /** 
+  /**
    * 请求动作模式 (核心配置)
-   * 
-   * mode: 'loadUrl' (默认) - WebView 导航模式
+   *
+   * action: 'loadUrl' (默认) - WebView 导航模式
    * ------------------------------------------------
    * - 适用场景: 普通 HTML 网页解析 (SSR/SPA)
    * - 请求方法: 仅支持 GET
    * - 解析能力: 支持所有选择器 (@css, @xpath, @json, @regex, @js)
    * - Cookie:  完全支持 (HttpOnly + Secure)
    * - 引擎:    WebView 渲染 DOM
-   * 
-   * mode: 'fetch' - Native API 请求模式
+   *
+   * action: 'fetch' - Native API 请求模式
    * ------------------------------------------------
    * - 适用场景: JSON API, POST 表单提交
    * - 请求方法: 支持 GET / POST
@@ -304,7 +304,7 @@ interface RequestConfig {
 - `{{pageIndex}}` - 页码索引 (从 0 开始)
 - `{{host}}` - 书源域名
 - `{{url}}` - 当前页面 URL
-- `{{@get:varName}}` - 获取存储的变量 (模块内有效)
+- `{{@get:varName}}` - 获取存储的变量 (同一书籍处理流程内有效)
 
 ## 4. 分页配置 (Pagination)
 
@@ -398,7 +398,9 @@ rule1 %% rule2     交织运算：按索引交错合并 (zip)
 
 ### 5.4 索引切片
 
-支持类似 Python 的切片语法（**仅在表达式尾部生效**）：
+支持类似 Python 的切片语法（**仅在表达式尾部生效**）。
+
+**切片判定规则**：仅当尾部 `[...]` 的内容是**纯切片语法**（如 `0`、`-1`、`1:5`、`::2`）时才解释为切片；否则视为 CSS 选择器的一部分（例如 `.item[data-id]` 不会被当作切片）。
 
 ```
 selector[0]        第一个元素
@@ -419,12 +421,17 @@ rule##pattern##replacement##1   只替换第一个匹配
 ### 5.6 变量系统
 
 ```
-@put:{key:rule}    存储变量 (仅当前模块请求链路内有效)
+@put:{key:rule}    存储变量 (指令)
 {{@get:key}}       读取变量 (在 URL 模板或表达式中使用)
 {{expression}}     插值 (可以是 JS 或嵌套规则)
 ```
 
-**变量作用域**：变量仅在当前模块的请求链路内有效（如 search 模块存的变量，在 chapter 模块中可读取，但跨书源无效）。
+**变量作用域**：
+- **后置指令语法**：在任意表达式末尾追加 `@put` 指令可实现“返回值不变 + 记录变量”。例如：`a@href @put:{bookId:a@data-id}`。`@put` 指令不会改变该字段的最终返回值。
+- **列表解析不会互相覆盖**：在 `parse.fields` 的列表解析中，`@put` 写入的是当前条目（Book/Chapter）的变量；不同条目各自独立保存，避免“最后一条覆盖前面所有条目”的问题。
+- **流程内可读**：基于某个条目继续请求时（search → detail → chapter → content），可通过 `{{@get:key}}` 读取该条目携带的变量。
+- **跨书源无效**：变量不会跨书源共享。
+- **全局 vars**：`vars` 定义的变量仅用 `{{varName}}` 引用。
 
 ## 6. 执行模型
 
