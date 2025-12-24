@@ -1,0 +1,18 @@
+{
+  "session_id": "ai-1766589123-34972",
+  "runtime_dir": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\codex",
+  "input_fifo": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\codex\\input.fifo",
+  "output_fifo": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\codex\\output.fifo",
+  "terminal": "wezterm",
+  "tmux_session": null,
+  "pane_id": "13",
+  "tmux_log": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\codex\\bridge_output.log",
+  "work_dir": "E:\\Code\\Scripting-Scripts",
+  "work_dir_norm": "e:/code/scripting-scripts",
+  "active": true,
+  "started_at": "2025-12-24 23:12:03",
+  "codex_session_path": "C:\\Users\\92111\\.codex\\sessions\\2025\\12\\24\\rollout-2025-12-24T23-07-29-019b50e6-9ed5-7d92-a1ef-7d821c0c1964.jsonl",
+  "codex_session_id": "019b50e6-9ed5-7d92-a1ef-7d821c0c1964",
+  "codex_start_cmd": "codex resume 019b50e6-9ed5-7d92-a1ef-7d821c0c1964",
+  "ended_at": "2025-12-24 23:11:26"
+}

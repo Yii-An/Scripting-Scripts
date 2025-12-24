@@ -1,0 +1,13 @@
+{
+  "session_id": "ai-1766589123-34972",
+  "runtime_dir": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\gemini",
+  "terminal": "wezterm",
+  "tmux_session": null,
+  "pane_id": "14",
+  "work_dir": "E:\\Code\\Scripting-Scripts",
+  "active": true,
+  "started_at": "2025-12-24 23:12:03",
+  "gemini_session_path": "C:\\Users\\92111\\.gemini\\tmp\\ab4cdbd6874590970033348e8014a1dc05688cc284893196b362ac19f83810c5\\chats\\session-2025-12-24T15-07-07690f33.json",
+  "gemini_project_hash": "ab4cdbd6874590970033348e8014a1dc05688cc284893196b362ac19f83810c5",
+  "gemini_session_id": "07690f33-bf18-47a7-aba8-e3231c163b4b"
+}
