@@ -57,10 +57,10 @@ export interface RequestConfig {
    */
   url: string
 
-  /** 
+  /**
    * 请求动作模式
-   * - loadUrl: (默认) WebView 导航模式。仅支持 GET。支持 @css/@xpath。Cookie 支持完美。
-   * - fetch: Native 接口请求模式。支持 POST。不支持 @css/@xpath。HttpOnly Cookie 无法获取。
+   * - loadUrl: (默认) WebView 导航模式。仅支持 GET。支持 @css/@xpath。
+   * - fetch: Native 接口请求模式。支持 POST。不支持 @css/@xpath。
    */
   action?: 'loadUrl' | 'fetch'
 
@@ -81,9 +81,6 @@ export interface RequestConfig {
 
   /** WebView 渲染完成后执行的 JS (仅 loadUrl 模式) */
   webJs?: string
-
-  /** 请求前执行的 JS (用于动态签名等) */
-  preJs?: string
 }
 
 // =============================================================================
@@ -273,9 +270,6 @@ export interface ChapterModule {
   /** 请求配置 */
   request?: RequestConfig
 
-  /** 预处理 JS (用于动态签名、Cookie 等) */
-  preScript?: string
-
   /** 解析规则 */
   parse: {
     /** 章节列表选择器 */
@@ -323,9 +317,6 @@ export interface ContentModule {
 
   /** 图片解密 JS (漫画用) */
   imageDecode?: string
-
-  /** 漫画图片请求头 (Referer 等) */
-  imageHeaders?: Record<string, string>
 }
 
 // =============================================================================
@@ -578,6 +569,95 @@ export interface RuleContext {
   keyword?: string
   /** 当前页码 */
   page?: number
+  /** 页码索引 (从 0 开始) */
+  pageIndex?: number
   /** 下一章 URL (正文分页时用于检测) */
   nextChapterUrl?: string
+  /** 流程变量存储 */
+  vars?: Record<string, unknown>
+}
+
+// =============================================================================
+// 表达式 AST 类型 (解析器内部使用)
+// =============================================================================
+
+/**
+ * 选择器类型
+ */
+export type SelectorType = 'css' | 'xpath' | 'json' | 'js' | 'regex'
+
+/**
+ * 组合运算符
+ */
+export type CombineOperator = '||' | '&&' | '%%'
+
+/**
+ * 切片范围
+ */
+export type SliceRange = {
+  start?: number
+  end?: number
+  step?: number
+}
+
+/**
+ * 正则替换配置
+ */
+export type RegexReplace = {
+  pattern: string
+  replacement: string
+  /** 是否只替换第一个 */
+  firstOnly?: boolean
+}
+
+/**
+ * 表达式节点 (AST)
+ */
+export type ExprNode =
+  | SelectorNode
+  | CombineNode
+  | PipelineNode
+
+/**
+ * 选择器节点
+ */
+export type SelectorNode = {
+  type: 'selector'
+  selectorType: SelectorType
+  expr: string
+  /** 属性提取 (@text, @href, @src 等) */
+  attr?: string
+  /** 切片范围 */
+  slice?: SliceRange
+  /** 正则替换 (##pattern##replacement) */
+  regexReplace?: RegexReplace
+  /** @put 指令 */
+  putVars?: Record<string, string>
+}
+
+/**
+ * 组合运算节点
+ */
+export type CombineNode = {
+  type: 'combine'
+  operator: CombineOperator
+  children: ExprNode[]
+}
+
+/**
+ * 管道节点 (多个选择器串联)
+ */
+export type PipelineNode = {
+  type: 'pipeline'
+  steps: ExprNode[]
+}
+
+/**
+ * 解析后的表达式
+ */
+export type ParsedExpr = {
+  /** AST 根节点 */
+  ast: ExprNode
+  /** 原始表达式 */
+  raw: string
 }

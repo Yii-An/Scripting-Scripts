@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "docs_mcp": {
+      "command": "npx",
+      "args": ["@jaxsonwang/docs-mcp", "mcp", "--persist-dir", "/Users/leslie/Documents/Code/Project/ScriptingApp.github.io/storage/llamaindex"]
+    }
+  }
+}

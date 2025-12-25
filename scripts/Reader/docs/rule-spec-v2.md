@@ -144,8 +144,6 @@ interface DetailModule {
 interface ChapterModule {
   /** 请求配置 */
   request?: RequestConfig
-  /** 预处理 JS (用于动态签名、Cookie 等) */
-  preScript?: string
   /** 解析规则 */
   parse: {
     /** 章节列表选择器 */
@@ -191,8 +189,6 @@ interface ContentModule {
   purify?: PurifyRule[]
   /** 图片解密 JS (漫画用) */
   imageDecode?: string
-  /** 漫画图片请求头 (Referer 等) */
-  imageHeaders?: Record<string, string>
 }
 
 interface PurifyRule {
@@ -262,7 +258,6 @@ interface RequestConfig {
    * - 适用场景: 普通 HTML 网页解析 (SSR/SPA)
    * - 请求方法: 仅支持 GET
    * - 解析能力: 支持所有选择器 (@css, @xpath, @json, @regex, @js)
-   * - Cookie:  完全支持 (HttpOnly + Secure)
    * - 引擎:    WebView 渲染 DOM
    *
    * action: 'fetch' - Native API 请求模式
@@ -270,7 +265,6 @@ interface RequestConfig {
    * - 适用场景: JSON API, POST 表单提交
    * - 请求方法: 支持 GET / POST
    * - 解析能力: 仅支持文本级解析 (@json, @regex, @js)。**不支持 @css/@xpath**。
-   * - Cookie:  受限支持 (无法自动获取 HttpOnly Cookie)
    * - 引擎:    Scripting Native Runtime
    */
   action?: 'loadUrl' | 'fetch'
@@ -292,9 +286,6 @@ interface RequestConfig {
   
   /** WebView 渲染后执行的 JS (仅 loadUrl 模式有效) */
   webJs?: string
-  
-  /** 请求前执行的 JS */
-  preJs?: string
 }
 ```
 
@@ -369,6 +360,41 @@ interface StopCondition {
 | `@js:` | JavaScript | loadUrl / fetch | `document.title` (loadUrl) / `JSON.parse(result).title` (fetch) |
 | `@regex:` | 正则表达式 | loadUrl / fetch | `@regex:chapter_(\d+)` |
 
+#### 5.1.1 JSONPath 支持说明（Scripting 环境）
+
+Scripting 环境**没有内置 JSONPath 库**。因此：
+
+- `@json:` / `$.` / `$[` 语法本身是规则规范的一部分，但需要在 `Source.jsLib` 中**自行注入 JSONPath 实现**，供规则引擎调用。
+- 如果不想引入 JSONPath，可以使用 `@js:` 规则直接操作 JSON 对象（`JSON.parse(result)` 或列表项 `result`）。
+
+**推荐约定（jsLib 提供一个全局函数）**：
+
+- 在 `jsLib` 中提供 `jsonpath(json: any, path: string): any`（返回任意值或数组）。
+- 引擎在执行 `@json:` 时调用该函数；如果不存在则报错提示“缺少 JSONPath 实现”。
+
+**示例：在 jsLib 注入 JSONPath + 在规则中使用**：
+
+```json
+{
+  "jsLib": "function jsonpath(json, path) { /* 这里放你的 JSONPath 实现 */ return null }",
+  "search": {
+    "request": { "url": \"{{host}}/api/search?q={{keyword}}\", \"action\": \"fetch\" },
+    "parse": {
+      "list": \"@json:$.data.list[*]\",
+      "fields": { \"name\": \"@json:$.title\", \"url\": \"@json:$.url\" }
+    }
+  }
+}
+```
+
+**示例：不使用 JSONPath，直接用 @js 操作 JSON**：
+
+```
+list:  @js:JSON.parse(result).data.list
+name:  @js:result.title
+url:   @js:result.url
+```
+
 ### 5.2 属性提取
 
 在选择器后使用 `@attrName` 提取属性：
@@ -433,6 +459,58 @@ rule##pattern##replacement##1   只替换第一个匹配
 - **跨书源无效**：变量不会跨书源共享。
 - **全局 vars**：`vars` 定义的变量仅用 `{{varName}}` 引用。
 
+### 5.7 插值求值规则
+
+`{{...}}` 是一种**字符串模板插值**机制，用于在运行时把上下文变量或计算结果嵌入到字符串中（最常见是 URL/POST body/Headers，以及在 `Expr` 内拼接动态片段）。
+
+#### 5.7.1 适用位置（哪些字段会进行插值）
+
+以下字段会进行插值渲染（出现 `{{...}}` 时才生效）：
+
+- `RequestConfig.url`（URL 模板）
+- `RequestConfig.body`（POST body 模板）
+- `RequestConfig.headers` 的 value（Header value 模板）
+- `login.url`（登录页 URL）
+- `DiscoverCategory.url`（静态分类 URL）
+
+在 `Expr`（例如 `parse.list` / `parse.fields.*` / `pagination.nextUrl` / `stop.urlEquals`）中也可以使用 `{{...}}`，用于把变量值拼接进表达式字符串（例如拼接请求参数、拼接选择器条件、或在 `@js:` 字符串中插入 `{{host}}`）。
+
+#### 5.7.2 语法边界与转义
+
+- 插值块的基本形式为：`{{ <content> }}`，两侧空白会被忽略。
+- `content` 内部不支持再嵌套 `{{...}}`（避免歧义）。
+- 如需输出字面量 `{{` 或 `}}`，使用反斜杠转义：
+  - `\{{` 输出 `{{`
+  - `\}}` 输出 `}}`
+
+#### 5.7.3 content 的可用形式（解析优先级）
+
+`{{...}}` 内的 `content` 支持三类写法（按优先级匹配）：
+
+1. **变量读取（内置/全局）**：`{{name}}`
+   - 先从内置变量中读取（如 `keyword/page/pageIndex/host/url` 等），再从 `Source.vars` 中读取同名键。
+   - 取不到时返回空字符串（推荐用 `@js:` 明确兜底逻辑）。
+
+2. **流程变量读取**：`{{@get:key}}`
+   - 读取由 `@put` 写入的变量。
+   - 变量作用域遵循 5.6 的说明：条目级隔离 + 流程内可读。
+
+3. **内联 JS 计算**：`{{@js: ... }}`（推荐用于"单行、纯同步"的动态值）
+   - 在 **Native JS Runtime** 中执行一段**表达式**，返回值会被转为字符串后插入模板（因此不支持 DOM：不能使用 `document`/`window`）。
+   - 运行环境可访问执行上下文（如 `source/book/chapter/keyword/page/pageIndex/baseUrl/url` 等），并可使用 `source.jsLib` 提供的工具函数。
+   - 当 `{{@js: ...}}` 出现在请求模板（URL/Body/Headers）中时，它发生在"发起请求之前"，因此不应依赖响应内容（此时 `result` 通常为 `undefined`）。
+   - 约束：必须是同步表达式；禁止 `await` / Promise（与 `@js:` 的同步约束一致）。
+
+> 说明：如果你需要“在插值里跑选择器/正则/JSONPath 再得到结果”，请直接把这段逻辑写成正常的 `Expr`（或 `@js:`），而不是在 `{{...}}` 中嵌套规则；插值的目标是字符串拼接与轻量计算。
+
+#### 5.7.4 求值时机（URL 模板 vs Expr vs @js）
+
+插值不是一次性“全局替换”，而是按不同上下文在不同阶段渲染：
+
+- **URL/Body/Headers 模板**：每次构造请求时渲染一次（分页时每一页都会渲染），渲染时可以使用当前的 `page/pageIndex` 与流程变量（`@get`）。
+- **普通 Expr（含 @css/@xpath/@json/@regex）**：每次执行该表达式时渲染一次；在列表解析中，对每个条目执行时都会使用该条目的上下文渲染。
+- **`@js:` 表达式**：先渲染插值，再执行 JS（因此 `@js:'{{host}}/a'` 是合法且常用的写法）。
+
 ## 6. 执行模型
 
 ### 6.1 规则编译
@@ -466,12 +544,6 @@ rule##pattern##replacement##1   只替换第一个匹配
 由于 Scripting 的 `WebViewController.evaluateJavaScript()` 要求**顶层 return**，且不支持等待 Promise，因此：
 *   **禁止** 在 `@js:` 规则中使用 `await` 或返回 Promise。
 *   **禁止** 在 `webJs` 中执行异步操作并期望返回值。
-
-### 6.5 认证与安全
-
-**Cookie 处理**：
-*   **loadUrl 模式**: WebView 自动管理 Cookie，完全支持 `HttpOnly` 和 `Secure` Cookie。这是处理登录状态（如小说网站）的最佳方式。
-*   **fetch 模式**: Native Runner 会尝试通过 `document.cookie` 获取 Cookie 并注入到请求头中。但受浏览器安全限制，**无法获取 HttpOnly Cookie**。因此，`fetch` 模式不适合需要 HttpOnly Cookie 维持会话的站点。
 
 ## 7. 类型定义
 
@@ -679,10 +751,7 @@ interface Chapter {
       "content": "@json:$.data.pages[*].url",
       "title": "@json:$.data.title"
     },
-    "imageDecode": "return url.replace('_encrypt', '');",
-    "imageHeaders": {
-      "Referer": "https://comic.com/"
-    }
+    "imageDecode": "return url.replace('_encrypt', '');"
   },
 
   "discover": {
@@ -714,7 +783,7 @@ interface Chapter {
 
 ### 8.3 混合模式示例 (WebView 获取 Token → API 请求)
 
-此示例展示真正的混合模式：先通过 `loadUrl` 访问网页获取 Cookie/Token，再用 `fetch` 调用 API。
+此示例展示真正的混合模式：先通过 `loadUrl` 访问网页获取 Token（或页面变量），再用 `fetch` 调用 API。
 
 ```json
 {

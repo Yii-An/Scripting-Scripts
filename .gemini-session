@@ -1,13 +1,13 @@
 {
-  "session_id": "ai-1766589123-34972",
-  "runtime_dir": "E:\\Temp\\claude-ai-92111\\ai-1766589123-34972\\gemini",
+  "session_id": "ai-1766656781-33974",
+  "runtime_dir": "/var/folders/hr/54ypw1s17yvbkpytvqvxrbnm0000gn/T/claude-ai-leslie/ai-1766656781-33974/gemini",
   "terminal": "wezterm",
   "tmux_session": null,
-  "pane_id": "14",
-  "work_dir": "E:\\Code\\Scripting-Scripts",
+  "pane_id": "35",
+  "work_dir": "/Users/leslie/Documents/Code/Project/Scripting",
   "active": true,
-  "started_at": "2025-12-24 23:12:03",
-  "gemini_session_path": "C:\\Users\\92111\\.gemini\\tmp\\ab4cdbd6874590970033348e8014a1dc05688cc284893196b362ac19f83810c5\\chats\\session-2025-12-24T15-07-07690f33.json",
-  "gemini_project_hash": "ab4cdbd6874590970033348e8014a1dc05688cc284893196b362ac19f83810c5",
-  "gemini_session_id": "07690f33-bf18-47a7-aba8-e3231c163b4b"
+  "started_at": "2025-12-25 17:59:41",
+  "gemini_session_path": "/Users/leslie/.gemini/tmp/030d21142385aec6d6bc83023549b8708d62096463c9fd27678206a11c439d12/chats/session-2025-12-25T02-34-54ab9d36.json",
+  "gemini_project_hash": "030d21142385aec6d6bc83023549b8708d62096463c9fd27678206a11c439d12",
+  "gemini_session_id": "54ab9d36-b117-4292-a8e1-344f9cd392b9"
 }
