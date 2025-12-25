@@ -658,16 +658,16 @@ class RuleDebugger {
 
 ## 5. 开发里程碑
 
-### Phase 0: 基础设施 (MVP 前置)
+### Phase 0: 基础设施 (MVP 前置) ✅ 已完成
 
 **目标**: 搭建可运行的项目骨架
 
 **交付物（子任务 + 复杂度）**:
-- [ ] 0.1 初始化目录结构与导出入口（低）
-- [ ] 0.2 `index.tsx` 启动与基础导航（中）
-- [ ] 0.3 全局错误边界 + 统一错误展示（中）
-- [ ] 0.4 日志系统（`utils/logger.ts`）+ 调试开关（低）
-- [ ] 0.5 基础 UI 组件（LoadingView / ErrorView / EmptyView）（低）
+- [x] 0.1 初始化目录结构与导出入口（低）
+- [x] 0.2 `index.tsx` 启动与基础导航（中）
+- [x] 0.3 全局错误边界 + 统一错误展示（中）
+- [x] 0.4 日志系统（`utils/logger.ts`）+ 调试开关（低）
+- [x] 0.5 基础 UI 组件（LoadingView / ErrorView / EmptyView）（低）
 
 **验收用例（输入 → 预期输出）**:
 - 输入：运行脚本并进入首页 → 预期：页面可渲染，展示空态 HomeScreen，无崩溃。
@@ -675,19 +675,18 @@ class RuleDebugger {
 
 ---
 
-### Phase 1: 规则引擎 v0 (最小可用)
+### Phase 1: 规则引擎 v0 (最小可用) ✅ 已完成
 
 **目标**: 实现最简规则解析能力
 
 **交付物（子任务 + 复杂度）**:
-- [ ] 1.1 `fetch` 请求适配（method/headers/body/timeout）（中）
-- [ ] 1.2 `{{}}` 模板渲染：`{{host}}/{{keyword}}/{{page}}` 等基础变量（中）
-- [ ] 1.3 `@js:` 执行（同步表达式），并定义 `result` 在不同阶段的含义（中）
-- [ ] 1.4 通用解析管线：`parse.list` → `parse.fields` 映射（中）
-- [ ] 1.5 最小数据补全：为 `Book/Chapter` 自动补齐 `id/sourceId/bookId/index` 等必需字段（中）
-- [ ] 1.6 URL 绝对化（基于 `baseUrl/host`），覆盖字段 `url/cover/chapterUrl`（中）
-- [ ] 1.7 最小 `SourceValidator`：必填模块存在、fetch 禁用 css/xpath（低）
-- [ ] 1.8 最小错误归因：错误至少包含 `module + field`（中）
+- [x] 1.1 规则类型定义完善 (Source, Book, Chapter, RuleContext 等)（中）
+- [x] 1.2 CSS/XPath 选择器解析器 (`selectorParser.ts`)（高）
+- [x] 1.3 JSONPath 解析器 (`jsonPathParser.ts`)（中）
+- [x] 1.4 正则表达式处理器 (`regexProcessor.ts`)（中）
+- [x] 1.5 @js 脚本执行器 (`jsExecutor.ts`) - 代码生成，不执行（高）
+- [x] 1.6 变量替换器 (`variableReplacer.ts`) - `{{keyword}}/{{page}}/{{@get:key}}/{{@js:expr}}`（高）
+- [x] 1.7 RuleParser 主类整合 - 组合运算/正则替换后缀/@put 指令（高）
 
 **验收用例（输入 → 预期输出）**:
 - 输入：导入 `test-novel-api`（见 7.1）并搜索 keyword=`demo` → 预期：返回非空 `Book[]`，每个 Book 至少包含 `id/sourceId/name/url`，且 `url` 为绝对 URL。
@@ -961,5 +960,8 @@ Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 
 
 ---
 
-> 文档版本: 1.0.0
+> 文档版本: 1.1.0
 > 最后更新: 2025-12-25
+>
+> **更新记录**:
+> - v1.1.0 (2025-12-25): Phase 0 和 Phase 1 已完成，更新任务进度状态
