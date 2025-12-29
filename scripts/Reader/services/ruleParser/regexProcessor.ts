@@ -50,8 +50,8 @@ export function parseRegexReplace(expr: string): {
     regexReplace: {
       pattern,
       replacement,
-      firstOnly: flags === '1',
-    },
+      firstOnly: flags === '1'
+    }
   }
 }
 
@@ -63,6 +63,9 @@ function splitByDelimiter(str: string, delimiter: string): string[] {
   let current = ''
   let i = 0
 
+  let inSingleQuote = false
+  let inDoubleQuote = false
+
   while (i < str.length) {
     // 检查转义
     if (str[i] === '\\' && str.slice(i + 1, i + 1 + delimiter.length) === delimiter) {
@@ -71,8 +74,34 @@ function splitByDelimiter(str: string, delimiter: string): string[] {
       continue
     }
 
+    // 转义任意字符（避免引号被误判）
+    if (str[i] === '\\') {
+      if (i + 1 < str.length) {
+        current += str.slice(i, i + 2)
+        i += 2
+      } else {
+        current += str[i]
+        i++
+      }
+      continue
+    }
+
+    // 引号状态（忽略引号内的分隔符）
+    if (!inDoubleQuote && str[i] === "'") {
+      inSingleQuote = !inSingleQuote
+      current += str[i]
+      i++
+      continue
+    }
+    if (!inSingleQuote && str[i] === '"') {
+      inDoubleQuote = !inDoubleQuote
+      current += str[i]
+      i++
+      continue
+    }
+
     // 检查分隔符
-    if (str.slice(i, i + delimiter.length) === delimiter) {
+    if (!inSingleQuote && !inDoubleQuote && str.slice(i, i + delimiter.length) === delimiter) {
       result.push(current)
       current = ''
       i += delimiter.length
@@ -90,27 +119,16 @@ function splitByDelimiter(str: string, delimiter: string): string[] {
 /**
  * 执行正则替换
  */
-export function applyRegexReplace(
-  text: string,
-  regexReplace: RegexReplace
-): string {
-  try {
-    const flags = regexReplace.firstOnly ? '' : 'g'
-    const regex = new RegExp(regexReplace.pattern, flags)
-    return text.replace(regex, regexReplace.replacement)
-  } catch {
-    // 正则表达式无效，返回原文
-    return text
-  }
+export function applyRegexReplace(text: string, regexReplace: RegexReplace): string {
+  const flags = regexReplace.firstOnly ? '' : 'g'
+  const regex = new RegExp(regexReplace.pattern, flags)
+  return text.replace(regex, regexReplace.replacement)
 }
 
 /**
  * 执行正则匹配并提取
  */
-export function applyRegexMatch(
-  text: string,
-  pattern: string
-): string | string[] | null {
+export function applyRegexMatch(text: string, pattern: string): string | string[] | null {
   try {
     const regex = new RegExp(pattern, 'g')
     const matches = text.match(regex)
@@ -144,7 +162,7 @@ export function parseRegex(expr: string): SelectorNode {
   return {
     type: 'selector',
     selectorType: 'regex',
-    expr: pattern,
+    expr: pattern
   }
 }
 
@@ -161,7 +179,7 @@ export function validateRegex(pattern: string): {
   } catch (e) {
     return {
       valid: false,
-      error: e instanceof Error ? e.message : 'Invalid regex',
+      error: e instanceof Error ? e.message : 'Invalid regex'
     }
   }
 }

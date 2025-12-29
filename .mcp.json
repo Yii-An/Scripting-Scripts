@@ -3,6 +3,10 @@
     "docs_mcp": {
       "command": "npx",
       "args": ["@jaxsonwang/docs-mcp", "mcp", "--persist-dir", "/Users/leslie/Documents/Code/Project/ScriptingApp.github.io/storage/llamaindex"]
+    },
+    "chrome-mcp-stdio": {
+      "command": "npx",
+      "args": ["node", "/Users/leslie/.volta/tools/image/packages/mcp-chrome-bridge/lib/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js"]
     }
   }
 }

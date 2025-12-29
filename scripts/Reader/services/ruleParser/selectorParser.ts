@@ -131,7 +131,7 @@ export function parseCssSelector(expr: string): SelectorNode {
     selectorType: 'css',
     expr: selector,
     attr,
-    slice,
+    slice
   }
 }
 
@@ -161,7 +161,7 @@ export function parseXPathSelector(expr: string): SelectorNode {
     selectorType: 'xpath',
     expr: axisParsed.selector,
     attr: axisParsed.attr ?? 'text',
-    slice,
+    slice
   }
 }
 
@@ -245,7 +245,7 @@ function parseSliceRange(sliceInner: string): SliceRange {
 function isSliceInner(inner: string): boolean {
   const trimmed = inner.trim()
   if (!trimmed) return false
-  if (!/^[0-9:\-]+$/.test(trimmed)) return false
+  if (!/^[0-9:-]+$/.test(trimmed)) return false
 
   const parts = trimmed.split(':')
   if (parts.length === 1) return isIntOrEmpty(parts[0])

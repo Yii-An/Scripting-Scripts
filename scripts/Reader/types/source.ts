@@ -143,15 +143,9 @@ export type Pagination = PaginationNextUrl | PaginationPageParam
 // =============================================================================
 
 /**
- * 内容净化规则 (正则替换)
+ * 内容净化规则（按顺序执行）
  */
-export interface PurifyRule {
-  /** 匹配正则表达式 */
-  pattern: string
-
-  /** 替换为 (默认空字符串) */
-  replacement?: string
-}
+export type PurifyRule = { type: 'css'; selector: string } | { type: 'regex'; pattern: string; replacement?: string }
 
 // =============================================================================
 // 搜索模块
@@ -297,6 +291,8 @@ export interface ContentFieldRules {
   content: Expr
   /** 标题 (部分站点只能从正文页获取) */
   title?: Expr
+  /** 内容净化规则列表（兼容 content.purify 与 content.parse.purify 两种位置） */
+  purify?: PurifyRule[]
 }
 
 /**
@@ -505,6 +501,8 @@ export interface Book {
   url: string
   /** 目录页 URL (如果与详情页不同) */
   chapterUrl?: string
+  /** 流程变量（@put 写入，{{@get:...}} 读取） */
+  vars?: Record<string, unknown>
 }
 
 /**
@@ -529,6 +527,8 @@ export interface Chapter {
   isVip?: boolean
   /** 是否付费 */
   isPay?: boolean
+  /** 流程变量（继承 Book.vars，并可被本章节的 @put 覆盖） */
+  vars?: Record<string, unknown>
 }
 
 /**
@@ -554,7 +554,7 @@ export interface Content {
  */
 export interface RuleContext {
   /** 当前元素 (列表解析时) - WebDomElement */
-  el?: any
+  el?: unknown
   /** 上一步的结果 */
   result?: unknown
   /** 当前页面 URL */
@@ -613,10 +613,7 @@ export type RegexReplace = {
 /**
  * 表达式节点 (AST)
  */
-export type ExprNode =
-  | SelectorNode
-  | CombineNode
-  | PipelineNode
+export type ExprNode = SelectorNode | CombineNode | PipelineNode
 
 /**
  * 选择器节点

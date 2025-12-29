@@ -14,6 +14,23 @@
 
 import type { RuleContext } from '../../types'
 
+export type JsEvaluator = (expr: string, context: RuleContext) => unknown
+
+export type ReplaceVariablesOptions = {
+  /**
+   * 是否允许执行 {{@js: ...}}。
+   *
+   * 默认 false：变量替换器只做插值替换，不负责执行表达式。
+   * 如需启用，请显式传入 allowJsEval: true，并建议提供 jsEvaluator 以便把执行委托给上层执行器。
+   */
+  allowJsEval?: boolean
+  /**
+   * 上层提供的 JS 执行器（推荐）。
+   * - 不提供时，在 allowJsEval: true 下会退化为不安全的 Function 求值（仅用于调试/兼容）。
+   */
+  jsEvaluator?: JsEvaluator
+}
+
 /**
  * 插值块匹配结果
  */
@@ -47,13 +64,7 @@ type ParsedInterpolation = {
 /**
  * 内置变量名列表
  */
-const BUILTIN_VARS = new Set([
-  'keyword',
-  'page',
-  'pageIndex',
-  'host',
-  'url',
-])
+const BUILTIN_VARS = new Set(['keyword', 'page', 'pageIndex', 'host', 'url'])
 
 /**
  * 查找所有插值块
@@ -99,7 +110,7 @@ function findInterpolations(template: string): InterpolationMatch[] {
               full: template.slice(start, j + 2),
               content: content.trim(),
               start,
-              end: j + 2,
+              end: j + 2
             })
           } else {
             content += '}}'
@@ -131,7 +142,7 @@ function parseInterpolation(match: InterpolationMatch): ParsedInterpolation {
     return {
       type: 'flow',
       value: content.slice(5).trim(),
-      match,
+      match
     }
   }
 
@@ -140,7 +151,7 @@ function parseInterpolation(match: InterpolationMatch): ParsedInterpolation {
     return {
       type: 'js',
       value: content.slice(4).trim(),
-      match,
+      match
     }
   }
 
@@ -149,7 +160,7 @@ function parseInterpolation(match: InterpolationMatch): ParsedInterpolation {
     return {
       type: 'builtin',
       value: content,
-      match,
+      match
     }
   }
 
@@ -157,7 +168,7 @@ function parseInterpolation(match: InterpolationMatch): ParsedInterpolation {
   return {
     type: 'global',
     value: content,
-    match,
+    match
   }
 }
 
@@ -205,7 +216,7 @@ function getFlowValue(name: string, context: RuleContext): string {
  * 注意：在实际实现中，这需要通过 Scripting 的 JS 执行环境
  * 这里只做基本的表达式求值
  */
-function evaluateJs(expr: string, context: RuleContext): string {
+function unsafeEvaluateJs(expr: string, context: RuleContext): string {
   try {
     // 构建执行上下文变量
     const contextVars: Record<string, unknown> = {
@@ -218,7 +229,7 @@ function evaluateJs(expr: string, context: RuleContext): string {
       baseUrl: context.baseUrl ?? '',
       url: context.baseUrl ?? '',
       result: context.result,
-      vars: context.vars ?? {},
+      vars: context.vars ?? {}
     }
 
     // 使用 Function 构造器创建沙箱执行环境
@@ -226,7 +237,7 @@ function evaluateJs(expr: string, context: RuleContext): string {
     const varValues = Object.values(contextVars)
 
     // 创建函数并执行
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+
     const fn = new Function(...varNames, `return (${expr})`)
     const result = fn(...varValues)
 
@@ -245,10 +256,7 @@ function evaluateJs(expr: string, context: RuleContext): string {
 /**
  * 解析单个插值的值
  */
-function resolveInterpolation(
-  parsed: ParsedInterpolation,
-  context: RuleContext
-): string {
+function resolveInterpolation(parsed: ParsedInterpolation, context: RuleContext, options: ReplaceVariablesOptions): string {
   switch (parsed.type) {
     case 'builtin':
       return getBuiltinValue(parsed.value, context)
@@ -257,7 +265,17 @@ function resolveInterpolation(
     case 'flow':
       return getFlowValue(parsed.value, context)
     case 'js':
-      return evaluateJs(parsed.value, context)
+      if (!options.allowJsEval) return ''
+
+      try {
+        const result = options.jsEvaluator ? options.jsEvaluator(parsed.value, context) : unsafeEvaluateJs(parsed.value, context)
+
+        if (result === undefined || result === null) return ''
+        return String(result)
+      } catch (e) {
+        console.warn(`[variableReplacer] JS evaluation failed: ${parsed.value}`, e)
+        return ''
+      }
   }
 }
 
@@ -268,10 +286,7 @@ function resolveInterpolation(
  * @param context 规则执行上下文
  * @returns 替换后的字符串
  */
-export function replaceVariables(
-  template: string,
-  context: RuleContext
-): string {
+export function replaceVariables(template: string, context: RuleContext, options: ReplaceVariablesOptions = {}): string {
   if (!template || !template.includes('{{')) {
     return template
   }
@@ -287,7 +302,7 @@ export function replaceVariables(
   for (let i = matches.length - 1; i >= 0; i--) {
     const match = matches[i]
     const parsed = parseInterpolation(match)
-    const value = resolveInterpolation(parsed, context)
+    const value = resolveInterpolation(parsed, context, options)
     result = result.slice(0, match.start) + value + result.slice(match.end)
   }
 
@@ -319,7 +334,7 @@ export function extractVariableNames(template: string): {
     builtin: [] as string[],
     global: [] as string[],
     flow: [] as string[],
-    js: [] as string[],
+    js: [] as string[]
   }
 
   if (!template) return result
@@ -406,7 +421,7 @@ export function validateTemplate(template: string): {
 
   return {
     valid: errors.length === 0,
-    errors,
+    errors
   }
 }
 
@@ -415,9 +430,14 @@ export function validateTemplate(template: string): {
  *
  * 便捷方法，从部分数据创建完整的 RuleContext
  */
-export function createVariableContext(
-  partial: Partial<RuleContext>
-): RuleContext {
+export function createVariableContext(partial: Partial<RuleContext>): RuleContext {
+  if (!partial.source) {
+    console.warn('[variableReplacer] createVariableContext called without source; using a placeholder Source')
+  }
+  if (partial.baseUrl == null) {
+    console.warn('[variableReplacer] createVariableContext called without baseUrl; defaulting to empty string')
+  }
+
   return {
     baseUrl: partial.baseUrl ?? '',
     source: partial.source ?? {
@@ -428,8 +448,8 @@ export function createVariableContext(
       enabled: true,
       search: { request: { url: '' }, parse: { list: '', fields: { name: '', url: '' } } },
       chapter: { parse: { list: '', fields: { name: '', url: '' } } },
-      content: { parse: { content: '' } },
+      content: { parse: { content: '' } }
     },
-    ...partial,
+    ...partial
   }
 }

@@ -1,4 +1,4 @@
-import { Color, ColorScheme, Size, VirtualNode, KeyboardType, Edge, Point, KeywordPoint, Visibility } from "scripting"
+import { Color, ColorScheme, Size, VirtualNode, KeyboardType, Edge, Point, KeywordPoint, Visibility, ReadableStream } from "scripting"
 
 declare global {
 
@@ -1672,147 +1672,197 @@ declare global {
     }[]
   }
 
+
   /**
    * Type definition for iOS UTType identifiers
    * Reference: https://developer.apple.com/documentation/uniformtypeidentifiers/system_declared_uniform_type_identifiers
    */
   type UTType =
-    // Image Types
-    | "public.image"                     // Generic image type
-    | "public.image.live-photo"          // Live Photo
-    | "public.image.raw"                 // RAW image
-    | "public.jpeg"                      // JPEG image
-    | "public.jpeg-2000"                 // JPEG 2000
-    | "public.png"                       // PNG image
-    | "public.heic"                      // HEIC image
-    | "public.heif"                      // HEIF image
-    | "public.gif"                       // GIF image
-    | "public.tiff"                      // TIFF image
-    | "com.compuserve.gif"               // GIF alias
-    | "public.svg-image"                 // SVG image
-    | "public.bmp"                       // BMP image
-    | "com.microsoft.bmp"                // BMP alias
-    | "com.microsoft.ico"                // ICO icon
+    // 3D content
+    | "public.3d-content"
+    | "com.pixar.universal-scene-description"
+    | "com.pixar.universal-scene-description-mobile"
 
-    // Video Types
-    | "public.movie"                     // Generic movie/video type
-    | "public.video"                     // Video
-    | "public.mpeg-4"                    // MP4 video
-    | "public.mpeg"                      // MPEG video
-    | "public.avi"                       // AVI video
-    | "public.quicktime-movie"           // QuickTime video
-    | "com.apple.quicktime-movie"        // QuickTime alias
-    | "public.3gpp"                      // 3GPP video
-    | "public.3gpp2"                     // 3GPP2 video
-    | "com.microsoft.windows-media-wmv"   // WMV video
-    | "com.microsoft.windows-media-wm"    // WM video
-    | "com.apple.m4v-video"              // M4V video
+    // Apple 3D content
+    | "com.apple.reality"
+    | "com.apple.scenekit.scene"
+    | "com.apple.arobject"
 
-    // Audio Types
-    | "public.audio"                     // Generic audio type
-    | "public.mp3"                       // MP3 audio
-    | "public.wav"                       // WAV audio
-    | "public.m4a"                       // M4A audio
-    | "public.aiff"                      // AIFF audio
-    | "com.apple.protected-mpeg-4-audio" // Protected audio
-    | "com.microsoft.windows-media-wma"   // WMA audio
-    | "public.aifc"                      // AIFC audio
-    | "public.midi"                      // MIDI audio
-    | "com.apple.coreaudio-format"       // Core Audio Format
+    // Apple file system objects
+    | "public.directory"
+    | "public.symlink"
+    | "public.mount-point"
+    | "com.apple.alias-file"
+    | "public.folder"
+    | "public.volume"
+    | "public.disk-image"
 
-    // Document Types
-    | "public.data"                      // Generic data type
-    | "public.text"                      // Text file
-    | "public.plain-text"                // Plain text
-    | "public.html"                      // HTML file
-    | "public.xml"                       // XML file
-    | "public.json"                      // JSON file
-    | "public.yaml"                      // YAML file
-    | "public.rtf"                       // RTF file
-    | "public.pdf"                       // PDF file
-    | "com.adobe.pdf"                    // Adobe PDF
-    | "public.markdown"                  // Markdown file
-    | "public.markdown-text"             // Markdown text
-    | "public.csv"                       // CSV file
-    | "public.source-code"               // Source code
-    | "public.swift-source"              // Swift source code
-    | "public.objective-c-source"        // Objective-C source code
-    | "public.c-source"                  // C source code
-    | "public.c-plus-plus-source"        // C++ source code
-    | "public.java-source"               // Java source code
-    | "public.python-script"             // Python script
-    | "public.shell-script"              // Shell script
-    | "public.ruby-script"               // Ruby script
+    // Apple image formats
+    | "public.heic"
+    | "public.heif"
+    | "com.apple.live-photo"
 
-    // Archive Types
-    | "public.zip-archive"               // ZIP archive
-    | "org.gnu.gnu-zip-archive"          // GZIP archive
-    | "public.tar-archive"               // TAR archive
-    | "org.gnu.gnu-zip-tar-archive"      // GZIP TAR archive
-    | "com.pkware.zip-archive"           // PKWare ZIP archive
-    | "com.rarlab.rar-archive"           // RAR archive
-    | "org.7-zip.7-zip-archive"          // 7ZIP archive
+    // Apple system types
+    | "com.apple.framework"
+    | "com.apple.application-bundle"
+    | "com.apple.application-and-system-extension"
+    | "com.apple.metadata-importer"
+    | "com.apple.quicklook-generator"
+    | "com.apple.xpc-service"
+    | "com.apple.systempreference.prefpane"
 
-    // Office Document Types
-    | "com.microsoft.word.doc"           // Word document
-    | "com.microsoft.word.docx"          // Word DOCX document
-    | "com.microsoft.excel.xls"          // Excel document
-    | "com.microsoft.excel.xlsx"         // Excel XLSX document
-    | "com.microsoft.powerpoint.ppt"     // PowerPoint document
-    | "com.microsoft.powerpoint.pptx"    // PowerPoint PPTX document
-    | "org.openxmlformats.wordprocessingml.document"   // OpenXML Word
-    | "org.openxmlformats.spreadsheetml.sheet"         // OpenXML Excel
-    | "org.openxmlformats.presentationml.presentation" // OpenXML PowerPoint
-    | "org.oasis-open.opendocument.text"              // OpenDocument Text
-    | "org.oasis-open.opendocument.spreadsheet"       // OpenDocument Spreadsheet
-    | "org.oasis-open.opendocument.presentation"      // OpenDocument Presentation
+    // Application files
+    | "com.adobe.pdf"
+    | "com.apple.rtfd"
+    | "com.apple.flat-rtfd"
+    | "org.idpf.epub-container"
 
-    // iWork Document Types
-    | "com.apple.iwork.pages.pages"     // Pages document
-    | "com.apple.iwork.numbers.numbers" // Numbers document
-    | "com.apple.iwork.keynote.keynote" // Keynote document
+    // Audio
+    | "public.mp3"
+    | "public.aiff-audio"
+    | "com.microsoft.waveform-audio"
+    | "public.midi-audio"
+    | "public.playlist"
+    | "public.m3u-playlist"
 
-    // System Types
-    | "public.folder"                    // Folder
-    | "public.directory"                 // Directory
-    | "public.symlink"                   // Symbolic link
-    | "public.url"                       // URL
-    | "public.file-url"                  // File URL
-    | "com.apple.application"            // Application
-    | "com.apple.application-bundle"     // Application bundle
-    | "com.apple.framework"              // Framework
-    | "com.apple.package"                // Package
-    | "com.apple.resolvable"            // Resolvable
-    | "public.executable"                // Executable
-    | "public.disk-image"                // Disk image
-    | "public.database"                  // Database
+    // Audio and video
+    | "com.apple.quicktime-movie"
+    | "public.mpeg"
+    | "public.mpeg-2-video"
+    | "public.mpeg-2-transport-stream"
+    | "public.mpeg-4"
+    | "public.mpeg-4-audio"
+    | "com.apple.protected-mpeg-4-video"
+    | "com.apple.protected-mpeg-4-audio"
+    | "public.avi"
 
-    // Font Types
-    | "public.font"                      // Font
-    | "public.truetype-font"             // TrueType font
-    | "public.opentype-font"             // OpenType font
-    | "com.adobe.postscript-font"        // PostScript font
+    // Compiled programming language sources
+    | "public.assembly-source"
+    | "public.c-header"
+    | "public.c-source"
+    | "public.c-plus-plus-header"
+    | "public.c-plus-plus-source"
+    | "public.objective-c-plus-plus-source"
+    | "public.objective-c-source"
+    | "public.swift-source"
 
-    // Graphic Design Types
-    | "com.adobe.photoshop-image"        // Photoshop file
-    | "com.adobe.illustrator.ai-image"   // Illustrator file
-    | "org.webmproject.webp"             // WebP image
+    // Compressed archives
+    | "public.archive"
+    | "public.zip-archive"
+    | "org.gnu.gnu-zip-archive"
+    | "public.bzip2-archive"
+    | "com.apple.archive"
 
-    // 3D File Types
-    | "public.3d-content"                // 3D content
-    | "public.usd"                       // USD file
-    | "public.obj"                       // OBJ file
-    | "public.stl"                       // STL file
+    // Cryptographic files
+    | "com.rsa.pkcs-12"
+    | "public.x509-certificate"
 
-    // Other Types
-    | "public.content"                   // Generic content
-    | "public.composite-content"         // Composite content
-    | "public.archive"                   // Archive
-    | "public.item"                      // Item
-    | "public.contact"                   // Contact
-    | "public.message"                   // Message
-    | "public.calendar-event"            // Calendar event
-    | "public.log"                       // Log
+    // Data interchange formats
+    | "public.delimited-values-text"
+    | "public.comma-separated-values-text"
+    | "public.tab-separated-values-text"
+    | "public.utf8-tab-separated-values-text"
+    | "public.rtf"
+    | "public.xml"
+    | "public.yaml"
+    | "public.json"
+    | "public.vcard"
+
+    // Executables
+    | "public.executable"
+    | "public.unix-executable"
+    | "public.windows-executable"
+
+    // Icon images
+    | "com.microsoft.ico"
+    | "com.apple.icns"
+
+    // Images
+    | "public.png"
+    | "com.compuserve.gif"
+    | "public.jpeg"
+    | "org.webmproject.webp"
+    | "public.tiff"
+    | "com.microsoft.bmp"
+    | "public.svg-image"
+    | "public.camera-raw-image"
+
+    // Internet-specific
+    | "public.html"
+    | "com.apple.webarchive"
+    | "com.apple.internet-location"
+    | "com.microsoft.internet-shortcut"
+
+    // Property lists
+    | "com.apple.property-list"
+    | "com.apple.xml-property-list"
+    | "com.apple.binary-property-list"
+
+    // Shazam
+    | "com.apple.shazamsignature"
+    | "com.apple.shazamcatalog"
+
+    // Scripted programming language sources
+    | "public.script"
+    | "com.apple.applescript.text"
+    | "com.netscape.javascript-source"
+    | "com.apple.applescript.script"
+    | "com.apple.applescript.script-bundle"
+    | "public.make-source"
+    | "public.shell-script"
+    | "public.python-script"
+    | "public.ruby-script"
+    | "public.perl-script"
+    | "public.php-script"
+
+    // Text files
+    | "public.text"
+    | "public.plain-text"
+    | "public.utf8-plain-text"
+    | "public.utf16-plain-text"
+    | "public.utf16-external-plain-text"
+
+    // URLs
+    | "public.url"
+    | "public.file-url"
+    | "com.apple.bookmark"
+
+    // Apple system base types
+    | "public.item"
+    | "public.content"
+    | "public.composite-content"
+    | "public.data"
+    | "com.apple.resolvable"
+    | "com.apple.package"
+    | "com.apple.bundle"
+    | "com.apple.plugin"
+    | "com.apple.application"
+    | "public.source-code"
+    | "public.bookmark"
+    | "public.log"
+
+    // Application base types
+    | "public.spreadsheet"
+    | "public.presentation"
+    | "public.database"
+    | "public.message"
+    | "public.contact"
+    | "public.calendar-event"
+    | "public.to-do-item"
+    | "public.email-message"
+    | "public.font"
+
+    // Image, audio, and video base types
+    | "public.image"
+    | "public.audio"
+    | "public.audiovisual-content"
+    | "public.movie"
+    | "public.video"
+
+    // Tag classes
+    | "public.filename-extension"
+    | "public.mime-type"
+
 
 
   /**
@@ -1991,6 +2041,13 @@ declare global {
       navigationType: "linkActivated" | "reload" | "backForward" | "formResubmitted" | "formSubmitted" | "other"
     }) => Promise<boolean>
     /**
+     * Load a webpage by a file path, returns a Promise with boolean value indicates that whether the load request is completed.
+     * @param path The path of a file that contains web content.
+     * @param allowingReadAccessTo The path of a file or directory containing web content that you grant the system permission to read. This path must not be empty. To prevent WebKit from reading any other content, specify the same value as the `path` parameter. To read additional files related to the content file, specify a directory. Default value is the same as the `path` parameter.
+     * @returns A Promise with boolean value indicates that whether the load request is completed.
+     */
+    loadFile(path: string, allowingReadAccessTo?: string): Promise<boolean>
+    /**
      * Load a webpage by a URL string, returns a Promise with boolean value indicates that whether the load request is completed.
      * @param url URL string.
      */
@@ -2062,9 +2119,9 @@ declare global {
       navigationTitle?: string
     }): Promise<void>
     /**
-     * Get the custom user agent string of the WebView, returns a Promise that resolves with the custom user agent string or `null` if it is not set.
+     * Get the custom user agent string of the WebView, returns the custom user agent string or `null` if it is not set.
      */
-    getCustomUserAgent(): Promise<string | null>
+    getCustomUserAgent(): string | null
     /**
      * Set the custom user agent string of the WebView, returns a Promise that resolves with a boolean value indicates whether the operation is successful.
      * @param userAgent The custom user agent string, or `null` to reset to the default user agent.
@@ -2077,27 +2134,27 @@ declare global {
      * console.log(userAgent) // "MyCustomUserAgent/1.0"
      * ```
      */
-    setCustomUserAgent(userAgent: string | null): Promise<boolean>
+    setCustomUserAgent(userAgent: string | null): boolean
     /**
      * Check whether there is a valid back item in the back-forward list.
      */
-    canGoBack(): Promise<boolean>
+    canGoBack(): boolean
     /**
      * Check whether there is a valid forward item in the back-forward list.
      */
-    canGoForward(): Promise<boolean>
+    canGoForward(): boolean
     /**
-     * Navigates to the back item in the back-forward list. Returns a Promise fulfills a boolean value indicates whether go back successfully.
+     * Navigates to the back item in the back-forward list. Returns a boolean value indicates whether go back successfully.
      */
-    goBack(): Promise<boolean>
+    goBack(): boolean
     /**
-     * Navigates to the forward item in the back-forward list. Returns a Promise fulfills a boolean value indicates whether go forward successfully.
+     * Navigates to the forward item in the back-forward list. Returns a boolean value indicates whether go forward successfully.
      */
-    goForward(): Promise<boolean>
+    goForward(): boolean
     /**
      * Reloads the current webpage.
      */
-    reload(): Promise<void>
+    reload(): void
     /**
      * Dismiss the WebView, if the WebView is not presented, do nothing. You can presented the WebView again before it was disposed.
      */
@@ -5257,28 +5314,164 @@ If the eventâ€™s calendar does not support availability settings, this propertyâ
   type JSONSchemaType = JSONSchemaPrimitive | JSONSchemaArray | JSONSchemaObject
 
   namespace Assistant {
+
     /**
-     * Indicates whether the Assistant API is available.
-     * This status depends on the selected AI provider and whether a valid API Key is configured.
-     * If the appropriate API Key is not provided, the Assistant API will be unavailable.
+     * The provider for the Assistant API.
+     */
+    type Provider = "openai" | "gemini" | "anthropic" | "deepseek" | "openrouter" | {
+      custom: string
+    }
+
+    /**
+     * A chunk of text output from the assistant.
+     */
+    type StreamTextChunk = {
+      type: 'text'
+      content: string
+    }
+
+    /**
+     * A chunk of reasoning output from the assistant.
+     */
+    type StreamReasoningChunk = {
+      type: 'reasoning'
+      content: string
+    }
+
+    /**
+     * A chunk of usage output from the assistant.
+     */
+    type StreamUsageChunk = {
+      type: 'usage'
+      content: {
+        /**
+         * The total cost of the request.
+         */
+        totalCost: number | null
+        /**
+         * The number of tokens that were read from cache.
+         */
+        cacheReadTokens: number | null
+        /**
+         * The number of tokens that were written to cache.
+         */
+        cacheWriteTokens: number | null
+        /**
+         * The number of input tokens.
+         */
+        inputTokens: number
+        /**
+         * The number of output tokens.
+         */
+        outputTokens: number
+      }
+    }
+
+    type StreamChunk = StreamTextChunk | StreamReasoningChunk | StreamUsageChunk
+
+    /**
+     * The text content of a message.
+     */
+    type MessageTextContent = string | {
+      type: 'text'
+      content: string
+    }
+
+    /**
+     * The image content of a message.
+     */
+    type MessageImageContent = {
+      type: 'image'
+      /**
+       * Base64 encoded image data string. Must include the `data:image/xxx;base64,` prefix.
+       */
+      content: string
+    }
+
+    /**
+     * The document content of a message.
+     */
+    type MessageDocumentContent = {
+      type: 'document'
+      content: {
+        /**
+         * The MIME type of the document data.
+         */
+        mediaType: string
+        /**
+         * Base64 encoded document data string.
+         */
+        data: string
+      }
+    }
+
+    /**
+     * The content of a message.
+     */
+    type MessageContent = MessageTextContent | MessageImageContent | MessageDocumentContent
+
+    type MessageItem = {
+      role: "user" | "assistant"
+      content: MessageContent | MessageContent[]
+    }
+
+    /**
+     * Indicates whether the user has access to the assistant.
      */
     const isAvailable: boolean
+
+
+    /**
+     * Indicates whether the assistant chat page is currently presented.
+     */
+    const isPresented: boolean
+
+    /**
+     * Indicates whether there is an active conversation with the assistant.
+     */
+    const hasActiveConversation: boolean
+
+    /**
+     * Requests streamed output from the assistant, returning a ReadableStream of chunks. You can pass in a system prompt, a list of messages, and specify the AI provider and model to use.
+     * @param options The options for the request.
+     * @param options.systemPrompt The system prompt to use for the request.
+     * @param options.messages The messages to use for the request.
+     * @param options.provider Specifies the AI provider to use. You can use a custom provider with the given name.
+     * @example
+     * const stream = await Assistant.requestStreaming({
+     *   systemPrompt: "You are a helpful assistant.",
+     *   messages: [
+     *     {
+     *       role: "user",
+     *       content: "Tell me a joke."
+     *     }
+     *   ],
+     *   provider: "openai"
+     * })
+     * for await (const chunk of stream) {
+     *   console.log(chunk)
+     * }
+     */
+    function requestStreaming(options: {
+      systemPrompt?: string | null
+      messages: MessageItem | MessageItem[]
+      provider?: Provider
+      modelId?: string
+    }): Promise<ReadableStream<StreamChunk>>
     /**
      * Requests structured JSON output from the assistant.
      * @param prompt The input prompt for the assistant.
      * @param schema The expected output JSON schema.
      * @param options The options for the request.
      * @param options.provider Specifies the AI provider to use. You can use a custom provider with the given name.
-     * @param options.modelId You must ensure the specified ID matches a model supported by that provider (e.g., `"gpt-4-turbo"` for OpenAI, or `"gemini-1.5-pro"` for Gemini). If not specified, the app will use the default model configured for the provider.
+     * @param options.modelId You must ensure the specified ID matches a model supported by that provider (e.g., `"gpt-4-turbo"` for OpenAI, or `"gemini-2.5-pro"` for Gemini). If not specified, the app will use the default model configured for the provider.
      * @returns A promise that resolves to the structured data.
      */
     function requestStructuredData<R>(
       prompt: string,
       schema: JSONSchemaArray | JSONSchemaObject,
       options?: {
-        provider: "openai" | "gemini" | "anthropic" | "deepseek" | "openrouter" | {
-          custom: string
-        }
+        provider: Provider
         modelId?: string
       }
     ): Promise<R>
@@ -5303,6 +5496,45 @@ If the eventâ€™s calendar does not support availability settings, this propertyâ
         modelId?: string
       }
     ): Promise<R>
+
+    /**
+     * Starts a conversation with the assistant. You can pass in a message and an optional list of images to send to the assistant. You should call `present` to present the assistant chat page.
+     * If the conversation is already running, this method will throw an error. You should call `stopConversation` to stop the conversation before starting a new one.
+     * @param options The options for the conversation.
+     * @param options.message The message to send to the assistant.
+     * @param options.images The images to send to the assistant.
+     * @param options.autoStart Whether to start the conversation automatically. Defaults to false.
+     * @param options.systemPrompt The system prompt to use for the conversation. The default system prompt is the Scripting Assistant system prompt, the Assistant Tools are available in this prompt. If you want to use a different system prompt, you can pass it in here, and the Assistant Tools are not available anymore.
+     * @param options.modelId The model ID to use for the conversation.
+     * @param options.provider The provider to use for the conversation. User can change the provider in the assistant chat page.
+     * @returns A promise that resolves when the conversation is created, or throws an error if the operation fails.
+     */
+    function startConversation(options: {
+      message: string
+      images?: UIImage[]
+      autoStart?: boolean
+      systemPrompt?: string
+      modelId?: string
+      provider?: Provider
+    }): Promise<void>
+
+    /**
+     * Stops the conversation with the assistant. This will dismiss the assistant chat page.
+     * @returns A promise that resolves when the conversation is stopped, or throws an error if the operation fails.
+     */
+    function stopConversation(): Promise<void>
+
+    /**
+     * Presents the assistant chat page. You can call this method after `startConversation` to present the assistant chat page, or represent the conversation after `dismiss` is called.
+     * @returns A promise that resolves when the assistant chat page is dismissed, or throws an error if the operation fails.
+     */
+    function present(): Promise<void>
+
+    /**
+     * Dismisses the assistant chat page. If `stopConversation` is called, this method will be called automatically.
+     * @returns A promise that resolves when the assistant chat page is dismissed, or throws an error if the operation fails.
+     */
+    function dismiss(): Promise<void>
   }
 
   /**
@@ -10454,6 +10686,19 @@ If the length of the value parameter exceeds the length of the `maximumUpdateVal
      * The regular variant of the Liquid Glass material.
      */
     static identity(): UIGlass
+  }
+
+  namespace AppStore {
+    /**
+     * Apens a modal that will allow user to interact with a product in the App Store without leaving the Scripting app.
+     * @param id The identifier of the app to open in the App Store.
+     * @returns A promise that resolves when the modal is closed. Or throws an error if there was already a modal open.
+     */
+    function presentApp(id: string): Promise<void>
+    /**
+     * Dismiss the modal that was opened using `presentApp`.
+     */
+    function dismissApp(): Promise<void>
   }
 
   // /**

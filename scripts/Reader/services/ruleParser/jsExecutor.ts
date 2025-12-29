@@ -91,11 +91,7 @@ export function injectJsLib(jsLib: string, code: string): string {
  * })()
  * ```
  */
-export function generateWebViewScript(
-  jsCode: string,
-  context: JsExecutionContext,
-  jsLib?: string
-): string {
+export function generateWebViewScript(jsCode: string, context: JsExecutionContext, jsLib?: string): string {
   const ctxDecl = renderContextDeclarations(context)
   const body = renderUserReturn(jsCode)
   const script = `return (function(){\n${ctxDecl}\n${body}\n})()`
@@ -109,11 +105,7 @@ export function generateWebViewScript(
  * - 这里仍使用 IIFE 包装，使得上下文变量与 jsLib 能在同一作用域内使用。
  * - 返回的是一个“表达式”（IIFE 调用本身是表达式），可直接交给 Native JS runtime 计算。
  */
-export function generateNativeScript(
-  jsCode: string,
-  context: JsExecutionContext,
-  jsLib?: string
-): string {
+export function generateNativeScript(jsCode: string, context: JsExecutionContext, jsLib?: string): string {
   const ctxDecl = renderContextDeclarations(context)
   const lib = jsLib?.trim()
   const libBlock = lib ? `${lib}\n\n` : ''
@@ -151,7 +143,7 @@ function renderContextDeclarations(context: JsExecutionContext): string {
     `const url = ${serializeForJs(context.url)};`,
     `const result = ${serializeForJs(context.result)};`,
     `const host = ${serializeForJs(host)};`,
-    `const flowVars = ${serializeForJs(context.flowVars)};`,
+    `const flowVars = ${serializeForJs(context.flowVars)};`
   ].join('\n')
 }
 
@@ -326,7 +318,7 @@ function serializeForJs(value: unknown): string {
   if (value instanceof Error) {
     return JSON.stringify({
       name: value.name,
-      message: value.message,
+      message: value.message
       // 不序列化 stack，避免过大；需要时可在上层显式传入
     })
   }

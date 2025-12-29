@@ -2,7 +2,7 @@
  * Loading 加载组件
  */
 
-import { VStack, Text, ProgressView } from 'scripting'
+import { ProgressView, Text, VStack } from 'scripting'
 
 export interface LoadingProps {
   /** 加载提示文字 */

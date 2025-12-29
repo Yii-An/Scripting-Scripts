@@ -700,12 +700,12 @@ class RuleDebugger {
 **目标**: 实现完整阅读流程
 
 **交付物（子任务 + 复杂度）**:
-- [ ] 2.1 `loadUrl` 请求适配：`loadURL` + `waitForLoad` + `evaluateJavaScript/getHTML` + `dispose`（中）
-- [ ] 2.2 `loadUrl + CSS` 最小执行链：支持 `selector@text/selector@href/selector@src`（高）
-- [ ] 2.3 SearchScreen：输入关键词 → 调用 `SourceExecutor.search` → 展示结果（中）
-- [ ] 2.4 ChapterListScreen：选择书籍 → 拉取目录 → 章节列表可点击（中）
-- [ ] 2.5 ReaderScreen（novel）：加载正文并渲染文本，支持上下章切换（中）
-- [ ] 2.6 最小导航与状态：加载态/错误态/空态统一（中）
+- [x] 2.1 `loadUrl` 请求适配：`loadURL` + `waitForLoad` + `evaluateJavaScript/getHTML` + `dispose`（中）
+- [x] 2.2 `loadUrl + CSS` 最小执行链：支持 `selector@text/selector@href/selector@src`（高）
+- [x] 2.3 SearchScreen：输入关键词 → 调用 `SourceExecutor.search` → 展示结果（中）
+- [x] 2.4 ChapterListScreen：选择书籍 → 拉取目录 → 章节列表可点击（中）
+- [x] 2.5 ReaderScreen（novel）：加载正文并渲染文本，支持上下章切换（中）
+- [x] 2.6 最小导航与状态：加载态/错误态/空态统一（中）
 
 **验收用例（输入 → 预期输出）**:
 - 输入：使用 `test-novel-html`（见 7.1）搜索 keyword=`demo` → 预期：SearchScreen 展示至少 1 条结果，点击进入目录页。
@@ -714,57 +714,57 @@ class RuleDebugger {
 
 ---
 
-### Phase 3: 规则能力补齐
+### Phase 3: 规则能力补齐 ✅ 已完成
 
 **目标**: 完善规则引擎高级功能
 
 **交付物**:
-- [ ] XPath 选择器支持
-- [ ] 组合运算 (`||` `&&` `%%`)
-- [ ] 索引切片 (`[0]` `[-1]` `[1:5]`)
-- [ ] 正则替换 (`##pattern##replacement`)
-- [ ] 分页系统 (nextUrl + pageParam)
-- [ ] 变量系统 (`@put` / `@get`)
-- [ ] 内容净化 (`purify`)
+- [x] XPath 选择器支持
+- [x] 组合运算 (`||` `&&` `%%`)
+- [x] 索引切片 (`[0]` `[-1]` `[1:5]`)
+- [x] 正则替换 (`##pattern##replacement`)
+- [x] 分页系统 (nextUrl + pageParam)
+- [x] 变量系统 (`@put` / `@get`)
+- [x] 内容净化 (`purify`)
 
-**验收标准**: 混合模式书源可正常运行
+**验收标准**: 混合模式书源可正常运行 ✅
 
 ---
 
-### Phase 4: 书架与持久化
+### Phase 4: 书架与持久化 ✅ 已完成
 
 **目标**: 产品化体验
 
 **交付物**:
-- [ ] 书架收藏功能
-- [ ] 阅读进度保存与恢复
-- [ ] 最近阅读列表
-- [ ] 更新检查 (章节数变化)
-- [ ] 阅读设置 (字体/主题/行距)
-- [ ] HomeScreen (首页书架)
+- [x] 书架收藏功能
+- [x] 阅读进度保存与恢复
+- [x] 最近阅读列表
+- [x] 更新检查 (章节数变化)
+- [x] 阅读设置 (字体/主题/行距)
+- [x] HomeScreen (首页书架)
 
-**验收标准**: 重启后进度与书架一致
+**验收标准**: 重启后进度与书架一致 ✅
 
 ---
 
-### Phase 5: 高级功能与优化
+### Phase 5: 高级功能与优化 🚧 进行中
 
 **目标**: 完善漫画支持与性能优化
 
 **交付物**:
-- [ ] 漫画阅读器 (图片列表/翻页)
-- [ ] 图片预加载与缓存
+- [x] 漫画阅读器 (图片列表/翻页)
+- [x] 图片预加载与缓存
 - [ ] `imageDecode` 图片解密
-- [ ] 图片防盗链加载路径：`fetch(url, { headers })` → 写入缓存文件 → `<Image filePath=...>`
-- [ ] 图片缓存键：`sourceId + imageUrl + headersHash`（避免不同 header 串缓存）
-- [ ] DiscoverScreen (发现页)
-- [ ] 书源管理 (导入/导出/排序)
-- [ ] 并发分页 (`parallel` 策略)
-- [ ] 请求限流 (`rateLimit`)
+- [x] 图片防盗链加载路径：`fetch(url, { headers })` → 写入缓存文件 → `<Image filePath=...>`
+- [x] 图片缓存键：`sourceId + imageUrl + headersHash`（避免不同 header 串缓存）
+- [x] DiscoverScreen (发现页)
+- [x] 书源管理 (导入/导出/排序)
+- [x] 并发分页 (`parallel` 策略)
+- [x] 请求限流 (`rateLimit`)
 - [ ] 登录支持 (`source.login`)
 - [ ] （可选优化）WebViewPool：实例复用与队列管理，但需重点防范状态污染与残留脚本
 
-**验收标准**: 漫画源可正常阅读，性能流畅
+**验收标准**: 漫画源可正常阅读，性能流畅 ✅ (基础功能已完成，登录/图片解密待开发)
 
 ---
 
@@ -928,17 +928,17 @@ Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 
 ### 7.2 验收检查清单
 
 **Phase 1 验收**:
-- [ ] 模板变量 `{{keyword}}` `{{host}}` 正确替换
-- [ ] fetch 请求成功返回数据
-- [ ] `@js:` 表达式正确执行
-- [ ] 返回 `Book[]` 数组
+- [x] 模板变量 `{{keyword}}` `{{host}}` 正确替换
+- [x] fetch 请求成功返回数据
+- [x] `@js:` 表达式正确执行
+- [x] 返回 `Book[]` 数组
 
 **Phase 2 验收**:
-- [ ] 搜索结果正确显示
-- [ ] 点击书籍进入详情页
-- [ ] 目录列表正确加载
-- [ ] 章节内容正确显示
-- [ ] 上下章切换正常
+- [x] 搜索结果正确显示
+- [x] 点击书籍进入详情页
+- [x] 目录列表正确加载
+- [x] 章节内容正确显示
+- [x] 上下章切换正常
 
 ---
 
@@ -960,8 +960,9 @@ Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 
 
 ---
 
-> 文档版本: 1.1.0
-> 最后更新: 2025-12-25
+> 文档版本: 1.2.0
+> 最后更新: 2025-12-29
 >
 > **更新记录**:
+> - v1.2.0 (2025-12-29): Phase 2-5 进度更新，Phase 0-4 全部完成，Phase 5 大部分完成（仅剩 imageDecode、登录支持、WebViewPool）
 > - v1.1.0 (2025-12-25): Phase 0 和 Phase 1 已完成，更新任务进度状态

@@ -15,11 +15,7 @@ import type { SelectorNode, SliceRange } from '../../types'
  */
 export function isJsonPath(expr: string): boolean {
   const trimmed = expr.trim()
-  return (
-    trimmed.startsWith('$.') ||
-    trimmed.startsWith('$[') ||
-    trimmed.startsWith('@json:')
-  )
+  return trimmed.startsWith('$.') || trimmed.startsWith('$[') || trimmed.startsWith('@json:')
 }
 
 /**
@@ -45,25 +41,24 @@ export function parseJsonPathSlice(path: string): {
   basePath: string
   slice?: SliceRange
 } {
-  // 匹配末尾的切片: [数字] 或 [start:end] 或 [start:end:step]
-  const sliceMatch = path.match(/\[(-?\d*):?(-?\d*):?(-?\d*)\]$/)
-
-  if (!sliceMatch) {
-    // 检查单索引: [数字] 或 [-数字]
-    const indexMatch = path.match(/\[(-?\d+)\]$/)
-    if (indexMatch) {
-      const index = parseInt(indexMatch[1], 10)
-      return {
-        basePath: path.slice(0, -indexMatch[0].length),
-        slice: { start: index, end: index + 1, step: 1 },
-      }
+  // 1) 单索引必须优先匹配，否则会被 slice 正则误判为 [start:end]
+  const indexMatch = path.match(/\[(-?\d+)\]$/)
+  if (indexMatch) {
+    const index = parseInt(indexMatch[1], 10)
+    return {
+      basePath: path.slice(0, -indexMatch[0].length),
+      slice: { start: index, end: index + 1, step: 1 }
     }
+  }
 
-    // 检查 [*] 通配符 - 不是切片
+  // 2) 匹配末尾的切片: [start:end] 或 [start:end:step]（至少包含一个冒号）
+  const sliceMatch = path.match(/\[(-?\d*):(-?\d*)(?::(-?\d*))?\]$/)
+  if (!sliceMatch) {
+    // [*] 通配符等场景 - 不是切片
     return { basePath: path }
   }
 
-  const [fullMatch, startStr, endStr, stepStr] = sliceMatch
+  const [fullMatch, startStr, endStr, stepStr = ''] = sliceMatch
   const basePath = path.slice(0, -fullMatch.length)
 
   const slice: SliceRange = {}
@@ -92,7 +87,7 @@ export function parseJsonPath(expr: string): SelectorNode {
     type: 'selector',
     selectorType: 'json',
     expr: basePath || jsonPath,
-    slice,
+    slice
   }
 }
 

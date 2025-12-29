@@ -2,7 +2,7 @@
  * 存储相关类型定义
  */
 
-import type { Book, Chapter, Source, SourceType } from './source'
+import type { Book, Chapter, Source } from './source'
 
 // =============================================================================
 // 书架数据
@@ -11,31 +11,29 @@ import type { Book, Chapter, Source, SourceType } from './source'
 /**
  * 书架书籍项
  */
-export interface BookshelfItem {
-  /** 书籍信息 */
-  book: Book
+export type BookshelfItem = Book & {
+  /** 添加时间戳 */
+  addedAt: number
+  /** 最后阅读时间戳（未读可为 0） */
+  lastReadAt: number
+  /** 最后阅读章节 ID */
+  lastChapterId?: string
   /** 最后阅读章节索引 */
   lastChapterIndex?: number
-  /** 最后阅读位置 (百分比 0-1) */
-  lastPosition?: number
-  /** 添加时间 */
-  addedAt: number
-  /** 最后阅读时间 */
-  lastReadAt?: number
-  /** 是否有更新 */
-  hasUpdate?: boolean
+  /** 阅读进度 (0-1) */
+  lastProgress?: number
+  /** 总章节数（用于更新检测） */
+  totalChapters?: number
 }
 
 /**
  * 书架数据
  */
 export interface BookshelfData {
-  /** 版本号 */
-  version: number
+  /** schema 版本号 */
+  schemaVersion: number
   /** 书籍列表 */
   books: BookshelfItem[]
-  /** 最后同步时间 */
-  lastSyncAt?: number
 }
 
 // =============================================================================
@@ -45,36 +43,46 @@ export interface BookshelfData {
 /**
  * 阅读器主题
  */
-export type ReaderTheme = 'light' | 'dark' | 'sepia' | 'green'
+export type ReaderTheme = 'light' | 'dark' | 'sepia'
 
 /**
  * 阅读器设置
  */
-export interface ReaderSettings {
-  /** 字体大小 (pt) */
-  fontSize: number
-  /** 行高倍数 */
-  lineHeight: number
-  /** 段落间距 (pt) */
-  paragraphSpacing: number
-  /** 主题 */
-  theme: ReaderTheme
-  /** 是否保持屏幕常亮 */
-  keepScreenOn: boolean
-  /** 翻页模式: scroll | paginated */
-  pageMode: 'scroll' | 'paginated'
+export type ReaderSettings = {
+  novel: {
+    /** 字体大小 (pt, 14-28) */
+    fontSize: number
+    /** 行高倍数 (1.2-2.0) */
+    lineHeight: number
+    /** 主题 */
+    theme: ReaderTheme
+    /** 自定义字体（可选） */
+    fontFamily?: string
+  }
+  general: {
+    /** 是否保持屏幕常亮 */
+    keepScreenOn: boolean
+    /** 调试模式：开启后输出更详细的日志 */
+    debugMode: boolean
+    /** 不安全抓取：允许记录未脱敏的 URL/headers/内容（仅建议书源调试时开启） */
+    unsafeCaptureEnabled: boolean
+  }
 }
 
 /**
  * 默认阅读器设置
  */
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
-  fontSize: 18,
-  lineHeight: 1.8,
-  paragraphSpacing: 12,
-  theme: 'light',
-  keepScreenOn: true,
-  pageMode: 'scroll',
+  novel: {
+    fontSize: 18,
+    lineHeight: 1.6,
+    theme: 'light'
+  },
+  general: {
+    keepScreenOn: true,
+    debugMode: false,
+    unsafeCaptureEnabled: false
+  }
 }
 
 // =============================================================================

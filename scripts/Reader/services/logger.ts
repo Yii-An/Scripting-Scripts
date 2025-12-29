@@ -16,7 +16,7 @@ export enum LogLevel {
   INFO = 1,
   WARN = 2,
   ERROR = 3,
-  NONE = 99,
+  NONE = 99
 }
 
 // =============================================================================
@@ -39,10 +39,10 @@ interface LogConfig {
 
 /** 默认配置 */
 const defaultConfig: LogConfig = {
-  debugEnabled: __DEV__ ?? false,
-  minLevel: __DEV__ ? LogLevel.DEBUG : LogLevel.WARN,
+  debugEnabled: false,
+  minLevel: LogLevel.WARN,
   showTimestamp: true,
-  showModule: true,
+  showModule: true
 }
 
 /** 当前配置 */
@@ -100,7 +100,7 @@ function log(level: LogLevel, levelName: string, module: string | undefined, ...
       console.log(prefix, ...args)
       break
     case LogLevel.INFO:
-      console.info(prefix, ...args)
+      console.log(prefix, ...args)
       break
     case LogLevel.WARN:
       console.warn(prefix, ...args)

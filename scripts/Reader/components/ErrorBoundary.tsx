@@ -6,8 +6,8 @@
  * - 这里采用“全局错误订阅 + 兜底 UI”的方式，尽最大可能捕获未处理异常并提供重试入口。
  */
 
-import { Button, Image, Navigation, ScrollView, Text, VStack, useCallback, useEffect, useMemo, useState, type VirtualNode } from 'scripting'
-import { formatErrorDetails, getErrorSubtitle, getErrorTitle, type ReaderError, toReaderError, type ReaderErrorContext } from '../types/error'
+import { Button, Image, Navigation, Script, ScrollView, Text, VStack, type VirtualNode, useCallback, useEffect, useMemo, useState } from 'scripting'
+import { type ReaderError, type ReaderErrorContext, formatErrorDetails, getErrorSubtitle, getErrorTitle, toReaderError } from '../types/error'
 
 type ErrorEvent = { error: unknown; context?: ReaderErrorContext }
 
@@ -59,9 +59,11 @@ function installGlobalErrorHandlers(onError: (event: ErrorEvent) => void) {
   }
 
   try {
-    const errorUtils = g.ErrorUtils as {
-      setGlobalHandler?: (handler: (error: unknown, isFatal?: boolean) => void) => void
-    } | undefined
+    const errorUtils = g.ErrorUtils as
+      | {
+          setGlobalHandler?: (handler: (error: unknown, isFatal?: boolean) => void) => void
+        }
+      | undefined
     if (errorUtils?.setGlobalHandler) {
       errorUtils.setGlobalHandler((error: unknown) => {
         report({ error })
@@ -87,9 +89,11 @@ function installGlobalErrorHandlers(onError: (event: ErrorEvent) => void) {
     }
 
     try {
-      const errorUtils = g.ErrorUtils as {
-        setGlobalHandler?: (handler: unknown) => void
-      } | undefined
+      const errorUtils = g.ErrorUtils as
+        | {
+            setGlobalHandler?: (handler: unknown) => void
+          }
+        | undefined
       if (errorUtils?.setGlobalHandler && prevErrorUtilsHandler) {
         errorUtils.setGlobalHandler(prevErrorUtilsHandler)
       }
@@ -103,13 +107,7 @@ function AppHost({ node }: { node: VirtualNode }) {
   return node
 }
 
-function ErrorFallback({
-  error,
-  onRetry,
-}: {
-  error: ReaderError
-  onRetry: () => void
-}) {
+function ErrorFallback({ error, onRetry }: { error: ReaderError; onRetry: () => void }) {
   const dismiss = Navigation.useDismiss()
 
   const title = getErrorTitle(error)
@@ -125,7 +123,14 @@ function ErrorFallback({
 
         <VStack spacing={10} padding={{ top: 8 }} alignment="center">
           <Button title="重试" action={onRetry} />
-          <Button title="关闭" role="cancel" action={() => dismiss()} />
+          <Button
+            title="关闭"
+            role="cancel"
+            action={() => {
+              dismiss()
+              Script.exit()
+            }}
+          />
         </VStack>
 
         {details ? (

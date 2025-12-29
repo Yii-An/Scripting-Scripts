@@ -77,7 +77,7 @@ export function createPaginatedData<T>(): PaginatedData<T> {
     items: [],
     page: 1,
     hasMore: true,
-    isLoadingMore: false,
+    isLoadingMore: false
   }
 }
 

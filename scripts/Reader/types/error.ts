@@ -6,11 +6,7 @@
 
 export type ReaderErrorKind = 'NetworkError' | 'ParseError' | 'SourceError' | 'UnknownError'
 
-export type ReaderError =
-  | NetworkError
-  | ParseError
-  | SourceError
-  | UnknownError
+export type ReaderError = NetworkError | ParseError | SourceError | UnknownError
 
 export type ReaderErrorContext = {
   sourceId?: string
@@ -93,7 +89,16 @@ export class UnknownError extends ReaderBaseError {
 }
 
 export function toReaderError(error: unknown, context?: ReaderErrorContext): ReaderError {
-  if (error instanceof ReaderBaseError) return error
+  if (error instanceof ReaderBaseError) {
+    if (context) {
+      const merged = mergeContext(error.context, context)
+      if (merged) {
+        // 保持现有 Error 实例（包含 statusCode/expr 等信息），仅补齐上下文用于定位。
+        ;(error as unknown as { context?: ReaderErrorContext }).context = merged
+      }
+    }
+    return error
+  }
 
   const message = getUnknownMessage(error)
   const mergedContext = mergeContext(undefined, context)

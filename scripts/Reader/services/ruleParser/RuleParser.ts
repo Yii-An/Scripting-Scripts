@@ -16,7 +16,7 @@
 
 import type { RegexReplace, SelectorNode } from '../../types'
 import { isJsonPath, parseJsonPath } from './jsonPathParser'
-import { isJsExpr, parseJsExpr, type JsNode } from './jsExecutor'
+import { type JsNode, isJsExpr, parseJsExpr } from './jsExecutor'
 import { isRegexExpr, parseRegex, parseRegexReplace } from './regexProcessor'
 import { isXPathSelector, parseCssSelector, parseXPathSelector } from './selectorParser'
 import { hasVariables, validateTemplate } from './variableReplacer'
@@ -145,14 +145,14 @@ export class RuleParser {
       node = {
         ...node,
         regexReplace: regexExtracted.regexReplace ?? node.regexReplace,
-        putVars: putExtracted.putVars ?? node.putVars,
+        putVars: putExtracted.putVars ?? node.putVars
       }
     }
 
     return {
       node,
       regexReplace: regexExtracted.regexReplace,
-      putVars: putExtracted.putVars,
+      putVars: putExtracted.putVars
     }
   }
 }
@@ -175,7 +175,7 @@ function parseComposite(expr: string): ExprNode {
   return {
     type: 'composite',
     operator: composite.operator,
-    children,
+    children
   }
 }
 
@@ -209,7 +209,9 @@ function splitTopLevelComposite(expr: string): CompositeSplit | null {
   }
 
   const operator = Array.from(operators)[0]
-  const parts = splitByOperator(expr, operator).map(s => s.trim()).filter(Boolean)
+  const parts = splitByOperator(expr, operator)
+    .map(s => s.trim())
+    .filter(Boolean)
   if (parts.length < 2) return null
 
   return { operator, parts }
@@ -363,7 +365,7 @@ function extractPutDirectives(expr: string): { baseExpr: string; putVars?: Recor
   const baseExpr = tokens.slice(0, end).join(' ').trim()
   return {
     baseExpr,
-    putVars: Object.keys(putVars).length ? putVars : undefined,
+    putVars: Object.keys(putVars).length ? putVars : undefined
   }
 }
 
@@ -529,4 +531,3 @@ function splitKeyValue(pair: string): { key: string; value: string } {
 
   return { key: pair.trim(), value: '' }
 }
-
