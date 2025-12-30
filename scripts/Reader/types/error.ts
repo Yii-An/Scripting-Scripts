@@ -10,7 +10,7 @@ export type ReaderError = NetworkError | ParseError | SourceError | UnknownError
 
 export type ReaderErrorContext = {
   sourceId?: string
-  module?: 'search' | 'detail' | 'chapter' | 'content' | 'discover' | 'unknown'
+  module?: 'search' | 'detail' | 'chapter' | 'content' | 'discover' | 'webview' | 'unknown'
   fieldPath?: string
   url?: string
 }

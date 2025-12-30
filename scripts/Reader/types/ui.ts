@@ -112,18 +112,6 @@ export interface BookDetailScreenParams {
 }
 
 /**
- * 章节列表屏幕参数
- */
-export interface ChapterListScreenParams {
-  /** 书籍 ID */
-  bookId: string
-  /** 书源 ID */
-  sourceId: string
-  /** 目录页 URL */
-  chapterUrl: string
-}
-
-/**
  * 阅读器屏幕参数
  */
 export interface ReaderScreenParams {

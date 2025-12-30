@@ -13,6 +13,16 @@
  */
 
 import type { RuleContext } from '../../types'
+import { createLogger } from '../logger'
+
+const log = createLogger('variableReplacer')
+const LOG_MAX_EXPR_CHARS = 200
+
+function truncateForLog(value: string, max = LOG_MAX_EXPR_CHARS): string {
+  const s = String(value ?? '')
+  if (s.length <= max) return s
+  return `${s.slice(0, max)}…(truncated, len=${s.length})`
+}
 
 export type JsEvaluator = (expr: string, context: RuleContext) => unknown
 
@@ -247,8 +257,8 @@ function unsafeEvaluateJs(expr: string, context: RuleContext): string {
     }
     return String(result)
   } catch (e) {
-    // JS 执行失败，返回空字符串
-    console.warn(`[variableReplacer] JS evaluation failed: ${expr}`, e)
+    // JS 执行失败，返回空字符串（不中断流程，但记录日志便于排查）
+    log.warn('unsafeEvaluateJs failed', { sourceId: context.source?.id, baseUrl: context.baseUrl, expr: truncateForLog(expr) }, e)
     return ''
   }
 }
@@ -273,7 +283,7 @@ function resolveInterpolation(parsed: ParsedInterpolation, context: RuleContext,
         if (result === undefined || result === null) return ''
         return String(result)
       } catch (e) {
-        console.warn(`[variableReplacer] JS evaluation failed: ${parsed.value}`, e)
+        log.warn('js interpolation evaluation failed', { sourceId: context.source?.id, baseUrl: context.baseUrl, expr: truncateForLog(parsed.value) }, e)
         return ''
       }
   }
@@ -432,10 +442,10 @@ export function validateTemplate(template: string): {
  */
 export function createVariableContext(partial: Partial<RuleContext>): RuleContext {
   if (!partial.source) {
-    console.warn('[variableReplacer] createVariableContext called without source; using a placeholder Source')
+    log.warn('createVariableContext called without source; using a placeholder Source')
   }
   if (partial.baseUrl == null) {
-    console.warn('[variableReplacer] createVariableContext called without baseUrl; defaulting to empty string')
+    log.warn('createVariableContext called without baseUrl; defaulting to empty string')
   }
 
   return {

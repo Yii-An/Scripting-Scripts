@@ -483,10 +483,10 @@ const CF_CHECK_SCRIPT = `return (function(){
       // ignore
     }
 
-    var titleMatch = /Just a moment|请稍候|Checking/i.test(title)
-    var bodyMatch = /Checking your browser|请稍候/i.test(bodyText)
+    var titleMatch = /Just a moment|请稍候/i.test(title)
+    var bodyMatch = /Checking your browser|请稍候|Checking/i.test(bodyText)
 
-    var isChallenge = Boolean(hasChallengeForm || hasCdnCgi || hasTurnstile || titleMatch || bodyMatch)
+    var isChallenge = Boolean(hasChallengeForm || hasCdnCgi || hasTurnstile || (titleMatch && bodyMatch))
     var isInteractive = Boolean(hasTurnstile)
 
     return {
@@ -507,6 +507,7 @@ const CF_CHECK_SCRIPT = `return (function(){
 
 async function waitForCloudflareChallenge(controller: WebViewController, options: CloudflareWaitOptions = {}): Promise<void> {
   const { maxWaitMs = 15_000, intervalMs = 500, debug, url, sourceId } = options
+  if (maxWaitMs <= 0) return
   const startedAt = Date.now()
   const checkTimeoutMs = Math.min(3_000, maxWaitMs)
   let lastSignals: CloudflareSignals | undefined
@@ -543,7 +544,7 @@ async function waitForCloudflareChallenge(controller: WebViewController, options
         debug?.step({ type: 'error', message: 'cf.turnstile', url, sourceId, data: lastSignals })
         throw new SourceError('检测到 Cloudflare Turnstile 验证，需要手动验证', {
           cause: { signals: lastSignals },
-          context: { module: 'unknown', sourceId, url }
+          context: { module: 'webview', sourceId, url }
         })
       }
     } catch (e) {
@@ -565,7 +566,7 @@ async function waitForCloudflareChallenge(controller: WebViewController, options
   debug?.step({ type: 'error', message: 'cf.timeout', durationMs: elapsed, url, sourceId, data: lastSignals })
   throw new SourceError('疑似 Cloudflare 验证页面，等待超时', {
     cause: { elapsedMs: elapsed, signals: lastSignals },
-    context: { module: 'unknown', sourceId, url }
+    context: { module: 'webview', sourceId, url }
   })
 }
 
@@ -580,6 +581,7 @@ export async function extractListByCss(
   const hostKey = getHostKey(url, source.host)
   const rateLimit = parseRateLimit(source.rateLimit)
   const debug = options.debug
+  const extractorStartedAt = Date.now()
 
   try {
     await acquireSlot(hostKey, rateLimit)
@@ -611,7 +613,8 @@ export async function extractListByCss(
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
 
-    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
+    const remainingMs = options.timeoutMs - (Date.now() - extractorStartedAt)
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id, maxWaitMs: Math.max(0, Math.min(15_000, remainingMs)) })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()
@@ -657,6 +660,7 @@ export async function extractListWithRootFieldsByCss(
   const hostKey = getHostKey(url, source.host)
   const rateLimit = parseRateLimit(source.rateLimit)
   const debug = options.debug
+  const extractorStartedAt = Date.now()
 
   try {
     await acquireSlot(hostKey, rateLimit)
@@ -688,7 +692,8 @@ export async function extractListWithRootFieldsByCss(
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
 
-    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
+    const remainingMs = options.timeoutMs - (Date.now() - extractorStartedAt)
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id, maxWaitMs: Math.max(0, Math.min(15_000, remainingMs)) })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()
@@ -737,6 +742,7 @@ export async function extractFieldsByCss(
   const hostKey = getHostKey(url, source.host)
   const rateLimit = parseRateLimit(source.rateLimit)
   const debug = options.debug
+  const extractorStartedAt = Date.now()
 
   try {
     await acquireSlot(hostKey, rateLimit)
@@ -768,7 +774,8 @@ export async function extractFieldsByCss(
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
 
-    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
+    const remainingMs = options.timeoutMs - (Date.now() - extractorStartedAt)
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id, maxWaitMs: Math.max(0, Math.min(15_000, remainingMs)) })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()

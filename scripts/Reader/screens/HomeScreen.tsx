@@ -2,7 +2,7 @@
  * HomeScreen 首页（书架）
  */
 
-import { Button, Group, HStack, Image, List, NavigationLink, Section, Text, VStack, useCallback, useMemo, useState } from 'scripting'
+import { Button, Group, HStack, Image, List, NavigationLink, Section, Text, VStack, useCallback, useEffect, useMemo, useRef, useState } from 'scripting'
 
 import { EmptyBookshelfView, EmptyView } from '../components'
 import { checkAllUpdates, getBookshelf, getRecentlyRead, removeBookFromBookshelf } from '../services/bookshelfService'
@@ -22,24 +22,39 @@ export function HomeScreen() {
   const [recentlyRead, setRecentlyRead] = useState<BookshelfItem[]>([])
   const [sources, setSources] = useState<Source[]>([])
   const [updatedKeys, setUpdatedKeys] = useState<Set<string>>(new Set())
+  const refreshSeqRef = useRef(0)
 
   const sourcesById = useMemo(() => new Map(sources.map(s => [s.id, s])), [sources])
 
+  useEffect(() => {
+    return () => {
+      // 使未完成刷新失效，避免卸载后更新状态
+      refreshSeqRef.current++
+    }
+  }, [])
+
   const refreshLocal = useCallback(async () => {
+    const seq = ++refreshSeqRef.current
     setSources(getStoredSources())
     setBookshelf(getBookshelf())
     try {
-      setRecentlyRead(await getRecentlyRead(10))
+      const recent = await getRecentlyRead(10)
+      if (seq !== refreshSeqRef.current) return
+      setRecentlyRead(recent)
     } catch {
+      if (seq !== refreshSeqRef.current) return
       setRecentlyRead([])
     }
   }, [])
 
   const refreshAndCheckUpdates = useCallback(async () => {
+    const seq = ++refreshSeqRef.current
     try {
       const updated = await checkAllUpdates()
+      if (seq !== refreshSeqRef.current) return
       setUpdatedKeys(new Set(updated.map(keyOf)))
     } catch {
+      if (seq !== refreshSeqRef.current) return
       setUpdatedKeys(new Set())
     } finally {
       await refreshLocal()

@@ -95,11 +95,17 @@ function renderRequest(
   options?: { urlOverride?: string }
 ): { url: string; request: RequestConfig } {
   const ctx = createVariableContext({ ...context, source })
-  const url = options?.urlOverride ?? replaceVariables(request.url, ctx)
+  const replace = (template: string) =>
+    replaceVariables(template, ctx, {
+      allowJsEval: true,
+      jsEvaluator: (expr, c) => evalJsExpr(`@js:${expr}`, c, c.source)
+    })
 
-  const headers = request.headers ? Object.fromEntries(Object.entries(request.headers).map(([k, v]) => [k, replaceVariables(v, ctx)])) : undefined
+  const url = options?.urlOverride ?? replace(request.url)
 
-  const body = request.body !== undefined ? replaceVariables(request.body, ctx) : undefined
+  const headers = request.headers ? Object.fromEntries(Object.entries(request.headers).map(([k, v]) => [k, replace(v)])) : undefined
+
+  const body = request.body !== undefined ? replace(request.body) : undefined
 
   return { url, request: { ...request, headers, body } }
 }
@@ -110,7 +116,10 @@ function normalizeTimeout(source: Source, request?: RequestConfig, options?: Exe
 
 function renderUrlTemplate(source: Source, urlTemplate: string, context: Partial<RuleContext>): string {
   const ctx = createVariableContext({ ...context, source })
-  return replaceVariables(urlTemplate, ctx)
+  return replaceVariables(urlTemplate, ctx, {
+    allowJsEval: true,
+    jsEvaluator: (expr, c) => evalJsExpr(`@js:${expr}`, c, c.source)
+  })
 }
 
 function ensureArray(value: unknown): unknown[] {

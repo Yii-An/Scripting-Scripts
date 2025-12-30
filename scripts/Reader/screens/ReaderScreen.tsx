@@ -69,9 +69,11 @@ export function ReaderScreen({
 
   const currentChapter = chapters[index]
   const scrollProxyRef = useRef<ScrollViewProxy | null>(null)
+  const mountedRef = useRef(false)
   const lastVisibleParagraphIndexRef = useRef(0)
   const restoredChapterIdRef = useRef<string | null>(null)
   const comicCachedPathsRef = useRef<Record<string, string>>({})
+  const comicCacheSeqRef = useRef(0)
   const preloadedNextChapterIdRef = useRef<string | null>(null)
   const loadSeqRef = useRef(0) // 请求序列号，用于防止竞态
 
@@ -99,6 +101,13 @@ export function ReaderScreen({
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     // 阅读页进入时刷新设置并应用常亮
@@ -171,9 +180,14 @@ export function ReaderScreen({
     (url: string) => {
       if (!url) return
       if (comicCachedPathsRef.current[url]) return
+      const seq = comicCacheSeqRef.current
       void cacheImage(url, source.headers, source.id)
         .then(filePath => {
+          if (!mountedRef.current) return
+          if (seq !== comicCacheSeqRef.current) return
           setComicCachedPaths(prev => {
+            if (!mountedRef.current) return prev
+            if (seq !== comicCacheSeqRef.current) return prev
             if (prev[url] === filePath) return prev
             const next = { ...prev, [url]: filePath }
             comicCachedPathsRef.current = next
@@ -188,6 +202,7 @@ export function ReaderScreen({
   )
 
   useEffect(() => {
+    comicCacheSeqRef.current++
     comicCachedPathsRef.current = {}
     setComicCachedPaths({})
     preloadedNextChapterIdRef.current = null

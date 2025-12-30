@@ -43,7 +43,11 @@ function normalizeBook(raw: Record<string, unknown>): Book | null {
   if (typeof raw.intro === 'string') book.intro = raw.intro
   if (typeof raw.latestChapter === 'string') book.latestChapter = raw.latestChapter
   if (typeof raw.updateTime === 'string') book.updateTime = raw.updateTime
-  if (typeof raw.status === 'string') book.status = raw.status as Book['status']
+  if (typeof raw.status === 'string') {
+    const normalized =
+      raw.status === 'ongoing' || raw.status === 'completed' || raw.status === 'hiatus' || raw.status === 'unknown' ? raw.status : 'unknown'
+    book.status = normalized
+  }
   if (Array.isArray(raw.tags) && raw.tags.every(t => typeof t === 'string')) book.tags = raw.tags as string[]
   if (typeof raw.chapterUrl === 'string') book.chapterUrl = raw.chapterUrl
   if (raw.vars && typeof raw.vars === 'object') book.vars = raw.vars as Record<string, unknown>

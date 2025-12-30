@@ -31,6 +31,14 @@ export function DiscoverScreen() {
   const refreshSeqRef = useRef(0)
   const booksSeqRef = useRef(0)
 
+  useEffect(() => {
+    return () => {
+      // 使未完成请求失效，避免卸载后更新状态
+      refreshSeqRef.current++
+      booksSeqRef.current++
+    }
+  }, [])
+
   const selectedSource = useMemo(() => sources.find(s => s.id === selectedSourceId) ?? null, [selectedSourceId, sources])
   const selectedCategory = useMemo(() => {
     if (categoriesState.status !== 'done') return null

@@ -2,7 +2,7 @@
  * SearchScreen 搜索
  */
 
-import { Button, List, NavigationLink, Picker, Section, Text, TextField, VStack, useCallback, useEffect, useMemo, useState } from 'scripting'
+import { Button, List, NavigationLink, Picker, Section, Text, TextField, VStack, useCallback, useEffect, useMemo, useRef, useState } from 'scripting'
 
 import { EmptyView, ErrorView, FullScreenLoading } from '../components'
 import type { Book, ReaderError, Source } from '../types'
@@ -24,6 +24,7 @@ export function SearchScreen() {
   const [state, setState] = useState<LoadState>({ status: 'idle' })
   const [sources, setSources] = useState<Source[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
+  const searchSeqRef = useRef(0)
 
   const refreshSources = useCallback(() => {
     const next = getAvailableSources()
@@ -49,19 +50,27 @@ export function SearchScreen() {
 
   const runSearch = useCallback(async () => {
     if (!selectedSource) return
+    const seq = ++searchSeqRef.current
+    const sourceId = selectedSource.id
 
     const kw = keyword.trim()
     if (!kw) {
-      setState({ status: 'done', books: [] })
+      if (seq === searchSeqRef.current) {
+        setState({ status: 'done', books: [] })
+      }
       return
     }
 
     setState({ status: 'loading' })
     try {
       const books = await searchBooks(selectedSource, kw)
+      if (seq !== searchSeqRef.current) return
+      if (selectedSource.id !== sourceId) return
       setState({ status: 'done', books })
     } catch (e) {
-      setState({ status: 'error', error: toReaderError(e, { sourceId: selectedSource.id, module: 'search' }) })
+      if (seq !== searchSeqRef.current) return
+      if (selectedSource.id !== sourceId) return
+      setState({ status: 'error', error: toReaderError(e, { sourceId, module: 'search' }) })
     }
   }, [keyword, selectedSource])
 

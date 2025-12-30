@@ -5,6 +5,8 @@
  * - 仅限制“请求开始频率”（requests per period），并提供队列等待
  */
 
+import { createLogger } from './logger'
+
 export type RateLimitConfig = { requests: number; period: number } // period in ms
 
 type Waiter = {
@@ -22,6 +24,7 @@ type HostState = {
 
 const states = new Map<string, HostState>()
 const STATE_IDLE_TTL_MS = 5 * 60_000
+const log = createLogger('rateLimiter')
 
 function getState(host: string): HostState {
   let state = states.get(host)
@@ -142,7 +145,7 @@ export function parseRateLimit(input?: string): RateLimitConfig | undefined {
 
   const match = raw.match(/^(\d+)\s*\/\s*(\d+(?:\.\d+)?)?\s*(ms|s|m|h)?$/i)
   if (!match) {
-    console.warn(`[rateLimiter] Invalid rateLimit format: ${raw}`)
+    log.warn('Invalid rateLimit format', { input: raw })
     return undefined
   }
 
@@ -156,7 +159,7 @@ export function parseRateLimit(input?: string): RateLimitConfig | undefined {
   // - ✅ 2/500ms
   // - ❌ 2/500 (ambiguous)
   if (amountRaw && !unitRaw) {
-    console.warn(`[rateLimiter] Invalid rateLimit format (missing unit): ${raw}`)
+    log.warn('Invalid rateLimit format (missing unit)', { input: raw })
     return undefined
   }
 
@@ -164,7 +167,7 @@ export function parseRateLimit(input?: string): RateLimitConfig | undefined {
   const unit = (unitRaw ?? 's').toLowerCase()
 
   if (!Number.isFinite(requests) || requests <= 0 || !Number.isFinite(amount) || amount <= 0) {
-    console.warn(`[rateLimiter] Invalid rateLimit values: ${raw}`)
+    log.warn('Invalid rateLimit values', { input: raw })
     return undefined
   }
 

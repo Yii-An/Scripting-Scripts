@@ -31,7 +31,8 @@ function stableHeadersString(headers?: Record<string, string>): string {
 }
 
 function sha256Hex(text: string): string {
-  const data = Data.fromRawString(text, 'utf-8') ?? Data.fromRawString('', 'utf-8')!
+  const data = Data.fromRawString(text, 'utf-8') ?? Data.fromString(text) ?? Data.fromRawString('', 'utf-8') ?? Data.fromString('')
+  if (!data) throw new Error('sha256Hex: failed to encode text')
   return Crypto.sha256(data).toHexString()
 }
 
