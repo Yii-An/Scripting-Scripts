@@ -306,7 +306,7 @@ export function ReaderScreen({
               {isComic ? (
                 <>
                   {comicImages.length ? (
-                    <LazyVStack alignment="leading" spacing={12}>
+                    <LazyVStack alignment="leading" spacing={0}>
                       {comicImages.map((url, i) => {
                         const cached = comicCachedPaths[url]
                         return cached ? (

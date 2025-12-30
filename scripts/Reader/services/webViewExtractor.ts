@@ -433,6 +433,142 @@ function getWebViewErrorMessage(result: unknown): string | null {
   return null
 }
 
+type CloudflareSignals = {
+  title: string
+  hasChallengeForm: boolean
+  hasCdnCgi: boolean
+  hasTurnstile: boolean
+  bodyPreview: string
+}
+
+type CloudflareCheckResult = {
+  isChallenge: boolean
+  isInteractive: boolean
+  signals: CloudflareSignals
+}
+
+type CloudflareWaitOptions = {
+  maxWaitMs?: number
+  intervalMs?: number
+  debug?: DebugOperationHandle | null
+  url?: string
+  sourceId?: string
+}
+
+const CF_CHECK_SCRIPT = `return (function(){
+  try {
+    var title = document.title || ''
+    var bodyText = ''
+    try {
+      bodyText = document.body && document.body.textContent ? document.body.textContent : ''
+    } catch (e) {
+      bodyText = ''
+    }
+    bodyText = String(bodyText).slice(0, 2000)
+
+    var hasChallengeForm = false
+    var hasCdnCgi = false
+    var hasTurnstile = false
+    try {
+      hasChallengeForm = Boolean(document.querySelector && document.querySelector('#challenge-form'))
+      hasCdnCgi = Boolean(
+        (document.querySelector && document.querySelector('script[src*="cdn-cgi"], link[href*="cdn-cgi"], iframe[src*="cdn-cgi"]')) ||
+          (location && typeof location.pathname === 'string' && location.pathname.indexOf('/cdn-cgi/') === 0)
+      )
+      hasTurnstile = Boolean(
+        (document.querySelector && document.querySelector('.cf-turnstile, iframe[src*="challenges.cloudflare.com"]')) ||
+          bodyText.indexOf('challenges.cloudflare.com') >= 0
+      )
+    } catch (e) {
+      // ignore
+    }
+
+    var titleMatch = /Just a moment|请稍候|Checking/i.test(title)
+    var bodyMatch = /Checking your browser|请稍候/i.test(bodyText)
+
+    var isChallenge = Boolean(hasChallengeForm || hasCdnCgi || hasTurnstile || titleMatch || bodyMatch)
+    var isInteractive = Boolean(hasTurnstile)
+
+    return {
+      isChallenge: isChallenge,
+      isInteractive: isInteractive,
+      signals: {
+        title: String(title),
+        hasChallengeForm: Boolean(hasChallengeForm),
+        hasCdnCgi: Boolean(hasCdnCgi),
+        hasTurnstile: Boolean(hasTurnstile),
+        bodyPreview: String(bodyText).slice(0, 200)
+      }
+    }
+  } catch (e) {
+    return { __error: String(e && e.message ? e.message : e) }
+  }
+})()`
+
+async function waitForCloudflareChallenge(controller: WebViewController, options: CloudflareWaitOptions = {}): Promise<void> {
+  const { maxWaitMs = 15_000, intervalMs = 500, debug, url, sourceId } = options
+  const startedAt = Date.now()
+  const checkTimeoutMs = Math.min(3_000, maxWaitMs)
+  let lastSignals: CloudflareSignals | undefined
+  let detected = false
+  let consecutiveErrors = 0
+
+  while (Date.now() - startedAt < maxWaitMs) {
+    try {
+      const result = await withTimeout(controller.evaluateJavaScript<unknown>(CF_CHECK_SCRIPT), checkTimeoutMs, 'WebView evaluate timed out')
+      consecutiveErrors = 0
+
+      const errorMessage = getWebViewErrorMessage(result)
+      if (errorMessage) throw new Error(errorMessage)
+
+      if (!result || typeof result !== 'object') return
+      const parsed = result as CloudflareCheckResult
+      if (!parsed.signals || typeof parsed.signals !== 'object') return
+      lastSignals = parsed.signals
+
+      if (!parsed.isChallenge) {
+        const elapsed = Date.now() - startedAt
+        if (detected && elapsed > intervalMs) {
+          debug?.step({ type: 'info', message: 'cf.passed', durationMs: elapsed, url, sourceId, data: lastSignals })
+        }
+        return
+      }
+
+      if (!detected) {
+        detected = true
+        debug?.step({ type: 'info', message: 'cf.detected', url, sourceId, data: lastSignals })
+      }
+
+      if (parsed.isInteractive) {
+        debug?.step({ type: 'error', message: 'cf.turnstile', url, sourceId, data: lastSignals })
+        throw new SourceError('检测到 Cloudflare Turnstile 验证，需要手动验证', {
+          cause: { signals: lastSignals },
+          context: { module: 'unknown', sourceId, url }
+        })
+      }
+    } catch (e) {
+      if (e instanceof SourceError) throw e
+      consecutiveErrors++
+      if (consecutiveErrors === 1) {
+        debug?.step({ type: 'info', message: 'cf.checkError', url, sourceId, data: { error: e instanceof Error ? e.message : String(e) } })
+      }
+      if (consecutiveErrors >= 3) {
+        debug?.step({ type: 'info', message: 'cf.checkAborted', url, sourceId, data: { consecutiveErrors } })
+        return
+      }
+    }
+
+    await new Promise<void>(resolve => setTimeout(resolve, intervalMs))
+  }
+
+  const elapsed = Date.now() - startedAt
+  debug?.step({ type: 'error', message: 'cf.timeout', durationMs: elapsed, url, sourceId, data: lastSignals })
+  throw new SourceError('疑似 Cloudflare 验证页面，等待超时', {
+    cause: { elapsedMs: elapsed, signals: lastSignals },
+    context: { module: 'unknown', sourceId, url }
+  })
+}
+
 export async function extractListByCss(
   source: Source,
   url: string,
@@ -474,6 +610,8 @@ export async function extractListByCss(
       throw new NetworkError('WebView waitForLoad failed', { context: { sourceId: source.id, url } })
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
+
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()
@@ -549,6 +687,8 @@ export async function extractListWithRootFieldsByCss(
       throw new NetworkError('WebView waitForLoad failed', { context: { sourceId: source.id, url } })
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
+
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()
@@ -627,6 +767,8 @@ export async function extractFieldsByCss(
       throw new NetworkError('WebView waitForLoad failed', { context: { sourceId: source.id, url } })
     }
     debug?.step({ type: 'info', message: 'webview.waitForLoad', url, durationMs: Date.now() - waitStartedAt })
+
+    await waitForCloudflareChallenge(controller, { debug, url, sourceId: source.id })
 
     if (options.captureHtml && debug) {
       const html = await controller.getHTML()
