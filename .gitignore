@@ -23,3 +23,5 @@ stats.html
 *.sw?
 /demo/
 /tmp
+.ccb_config/
+opencode.json
