@@ -10,9 +10,7 @@ dist
 dist-ssr
 stats.html
 *.local
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+.vscode/
 .idea
 .serena
 .DS_Store
@@ -28,3 +26,18 @@ opencode.json
 .playwright-mcp/
 /jm-*.png
 .claude
+
+# 杂散 npm lockfile（本项目用 pnpm）
+package-lock.json
+# Cloudflare Wrangler 本地状态 / 密钥
+.wrangler/
+.dev.vars
+.dev.vars.*
+# 环境变量 / 密钥（预防性）
+.env
+.env.*
+!.env.example
+# TS 增量编译缓存
+*.tsbuildinfo
+# Scripting App 本地编辑器偏好（每台机器各自）
+scripting.config.json
