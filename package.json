@@ -1,0 +1,53 @@
+{
+  "name": "scripting-scripts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "serve": "npx scripting-cli start --no-auto-open --bonjour",
+    "watch": "tsx watch.ts",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+    "lint:check": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write \"scripts/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"scripts/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "type-check": "tsc --noEmit",
+    "code-quality": "npm run lint && npm run format && npm run type-check",
+    "ncu": "npx npm-check-updates --reject '' -u",
+    "validate-source": "tsx scripts/ComicReader/test-harness/cli.ts",
+    "build-source-index": "tsx scripts/ComicReader/test-harness/build-source-index.ts",
+    "serve-sources": "tsx scripts/ComicReader/test-harness/serve-sources.ts",
+    "publish-sources": "npm run build-source-index && npx --yes wrangler pages deploy scripts/ComicReader/source-repo --project-name comicreader-sources --branch main",
+    "test:crdt": "tsx scripts/ComicReader/test-harness/crdt.test.ts",
+    "test:merge": "tsx scripts/ComicReader/test-harness/mergeWorkCRDT.test.ts",
+    "test:functional": "tsx --tsconfig scripts/ComicReader/test-harness/tsconfig.json scripts/ComicReader/test-harness/functional-bookshelf.test.ts",
+    "test:source": "tsx --tsconfig scripts/ComicReader/test-harness/tsconfig.json scripts/ComicReader/test-harness/functional-source.test.ts",
+    "test": "npm run test:crdt && npm run test:merge && npm run test:functional && npm run test:source"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@types/chokidar": "^2.1.7",
+    "@types/eslint-config-prettier": "^6.11.3",
+    "@types/fs-extra": "^11.0.4",
+    "chokidar": "^4.0.3",
+    "esbuild": "^0.27.1",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "fs-extra": "^11.3.1",
+    "jiti": "^2.7.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.14.0",
+  "volta": {
+    "node": "24.11.1",
+    "pnpm": "10.25.0"
+  }
+}

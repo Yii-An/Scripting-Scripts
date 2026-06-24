@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- NSFW + 公开地址：不希望被搜索引擎收录 -->
+<meta name="robots" content="noindex, nofollow" />
+<meta name="color-scheme" content="light dark" />
+<title>ComicReader 书源</title>
+<style>
+  /* —— 设计系统：暖中性(stone) + 金色 accent，light/dark 自适应 ——
+     排版沿用 "Modern Dark Cinema" 规范：display 紧字距、label 大写宽字距、字重做层级。
+     字体走系统栈（Apple 设备 = San Francisco），零外部依赖、CN 也即时渲染。 */
+  :root {
+    --bg: #f7f6f4; --bg-glow: rgba(180, 130, 30, 0.05);
+    --surface: #ffffff; --surface-2: #f3f1ee; --surface-hover: #fbfaf8;
+    --text: #1c1917; --muted: #79716b; --faint: #a8a29e;
+    --line: #ebe8e4; --line-strong: #e0dcd6;
+    --accent: #a16207; --accent-text: #9a5d06; --on-accent: #ffffff;
+    --nsfw-fg: #c2410c; --nsfw-bg: rgba(234, 88, 12, 0.10);
+    --safe-fg: #15803d; --safe-bg: rgba(22, 163, 74, 0.10);
+    --shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 6px 16px -8px rgba(28, 25, 23, 0.10);
+    --shadow-hover: 0 2px 4px rgba(28, 25, 23, 0.05), 0 14px 30px -12px rgba(28, 25, 23, 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0a09; --bg-glow: rgba(224, 176, 87, 0.06);
+      --surface: #171614; --surface-2: #232120; --surface-hover: #1d1b19;
+      --text: #f5f3f0; --muted: #a8a29e; --faint: #6b6560;
+      --line: #2a2724; --line-strong: #353230;
+      --accent: #e0b057; --accent-text: #e6bd72; --on-accent: #171614;
+      --nsfw-fg: #fb9a6b; --nsfw-bg: rgba(251, 146, 60, 0.12);
+      --safe-fg: #6ee79f; --safe-bg: rgba(74, 222, 128, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -10px rgba(0, 0, 0, 0.6);
+      --shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.5), 0 18px 40px -14px rgba(0, 0, 0, 0.75);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    background-image: radial-gradient(120% 60% at 50% -10%, var(--bg-glow), transparent 60%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: clamp(28px, 6vw, 56px) 18px 64px; }
+
+  /* —— 头部 —— */
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+    color: var(--accent); background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow);
+  }
+  .mark svg { width: 22px; height: 22px; }
+  h1 { font-size: clamp(21px, 5.2vw, 32px); font-weight: 700; letter-spacing: -0.022em; margin: 0; line-height: 1.15; }
+  .count {
+    font-size: 12px; font-weight: 600; color: var(--accent-text);
+    background: var(--surface-2); border: 1px solid var(--line); padding: 2px 9px; border-radius: 999px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .titlerow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .hint {
+    margin: 16px 0 0; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    font-size: 13px; color: var(--muted); box-shadow: var(--shadow);
+  }
+  .hint svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--accent); }
+  .hint b { color: var(--text); font-weight: 600; }
+
+  /* —— 置顶工具栏：搜索 + 分级筛选 —— */
+  .toolbar {
+    position: sticky; top: 0; z-index: 10; margin: 20px 0 0; padding: 12px 0;
+    background: color-mix(in srgb, var(--bg) 84%, transparent);
+    backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
+    display: flex; flex-direction: column; gap: 13px;
+  }
+  .search { position: relative; }
+  .search > svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
+  .search input {
+    width: 100%; font-family: inherit; font-size: 16px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 11px;
+    padding: 10px 14px 10px 38px; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .search input::placeholder { color: var(--faint); }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .chiprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chips { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--line-strong); padding: 6px 12px; border-radius: 999px;
+    transition: color .15s, background .15s, border-color .15s; -webkit-tap-highlight-color: transparent;
+  }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip[aria-pressed="true"] { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+  .chip .n { opacity: .65; margin-left: 5px; font-variant-numeric: tabular-nums; }
+  .chip[aria-pressed="true"] .n { opacity: .8; }
+  .spacer { flex: 1; }
+  .shown { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* —— 列表 / 卡片（响应式网格）—— */
+  /* minmax(0,1fr) 而非 1fr：1fr 的最小轨道取内容 min-content，会被卡片内 nowrap 内容撑宽导致横向溢出 */
+  .list { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  @media (min-width: 720px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px;
+    box-shadow: var(--shadow); transition: transform .22s cubic-bezier(.22,1,.36,1), box-shadow .22s, border-color .22s, background .22s;
+  }
+  @media (hover: hover) {
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--line-strong); background: var(--surface-hover); }
+  }
+  .chead { display: flex; align-items: center; gap: 12px; }
+  .mono-avatar {
+    flex: none; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
+    font-size: 18px; font-weight: 700; color: var(--accent-text);
+    background: var(--surface-2); border: 1px solid var(--line);
+  }
+  .namewrap { flex: 1; min-width: 0; }
+  .name { font-size: 16.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badges { display: flex; align-items: center; gap: 6px; flex: none; }
+  .pill {
+    font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 7px; white-space: nowrap;
+    letter-spacing: 0.01em; font-variant-numeric: tabular-nums;
+    background: var(--surface-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .pill.nsfw { background: var(--nsfw-bg); color: var(--nsfw-fg); border-color: transparent; }
+  .pill.safe { background: var(--safe-bg); color: var(--safe-fg); border-color: transparent; }
+  .meta {
+    margin-top: 10px; font-size: 12px; color: var(--faint);
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hosts { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .host {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+    font-size: 11.5px; color: var(--muted); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+  .host svg { width: 12px; height: 12px; flex: none; color: var(--faint); }
+  .host span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .urlrow { margin-top: 13px; display: flex; align-items: center; gap: 8px; }
+  .urlrow code {
+    /* display:block（非 flex）才能让 text-overflow:ellipsis 生效——窄屏长 URL 才会省略而非溢出 */
+    flex: 1; min-width: 0; display: block; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12px; color: var(--muted); background: var(--surface-2);
+    border: 1px solid var(--line); padding: 9px 11px; border-radius: 9px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+  .copy {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    color: var(--on-accent); background: var(--accent); border: none;
+    padding: 8px 14px; border-radius: 9px; transition: background .18s, transform .12s, opacity .18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .copy svg { width: 15px; height: 15px; }
+  .copy:hover { opacity: .9; }
+  .copy:active { transform: scale(.96); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { background: var(--safe-fg); }
+
+  /* —— 入场动效 + 骨架 + 空态 —— */
+  .card.intro { animation: fadeUp .5s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .skel { position: relative; overflow: hidden; }
+  .skel::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(128,128,128,.10), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .skel .bar { height: 11px; border-radius: 6px; background: var(--surface-2); }
+  .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 44px 0; font-size: 14px; }
+
+  footer { margin-top: 30px; text-align: center; color: var(--faint); font-size: 12px; }
+  footer code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .state { text-align: center; color: var(--muted); padding: 48px 0; font-size: 14px; grid-column: 1 / -1; }
+  .state.err { color: var(--nsfw-fg); }
+
+  /* —— 小屏收敛：字号 / 间距 / 控件尺寸整体下调一档（搜索框保持 16px 防 iOS 聚焦缩放）—— */
+  @media (max-width: 480px) {
+    body { font-size: 14px; }
+    .wrap { padding: 22px 14px 48px; }
+    .brand { align-items: flex-start; gap: 11px; }
+    .mark { width: 38px; height: 38px; border-radius: 11px; }
+    .mark svg { width: 20px; height: 20px; }
+    .count { font-size: 11px; }
+    .hint { padding: 11px 12px; font-size: 12.5px; gap: 8px; }
+    .toolbar { padding: 10px 0; }
+    .card { padding: 14px; border-radius: 14px; }
+    .chead { gap: 10px; }
+    .mono-avatar { width: 36px; height: 36px; font-size: 16px; border-radius: 10px; }
+    .name { font-size: 15px; }
+    .meta { font-size: 11px; }
+    .host { font-size: 11px; padding: 3px 7px; }
+    .urlrow code { font-size: 11px; padding: 8px 10px; }
+    .copy { padding: 8px 12px; font-size: 12.5px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card.intro { animation: none; }
+    .skel::after { animation: none; }
+    .card, .copy, .chip, .search input { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
+      </div>
+      <div class="titlerow">
+        <h1 id="title">ComicReader 书源</h1>
+        <span class="count" id="count" hidden></span>
+      </div>
+    </div>
+    <div class="hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <div>复制导入地址 → 在 <b>ComicReader → 书源 → 导入</b> 粘贴即可订阅。检查更新会按该地址重拉、比对版本号。</div>
+    </div>
+  </header>
+
+  <div class="toolbar" id="toolbar" hidden>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="搜索书源名 / id / 域名…" aria-label="搜索书源" />
+    </div>
+    <div class="chiprow">
+      <div class="chips" id="chips" role="group" aria-label="按分级筛选"></div>
+      <span class="spacer"></span>
+      <span class="shown" id="shown"></span>
+    </div>
+  </div>
+
+  <main class="list" id="list">
+    <div class="card skel"><div class="bar" style="width:45%"></div><div class="bar" style="width:70%;margin-top:14px"></div><div class="bar" style="width:90%;margin-top:14px"></div></div>
+    <div class="card skel"><div class="bar" style="width:40%"></div><div class="bar" style="width:65%;margin-top:14px"></div><div class="bar" style="width:88%;margin-top:14px"></div></div>
+    <div class="card skel"><div class="bar" style="width:50%"></div><div class="bar" style="width:72%;margin-top:14px"></div><div class="bar" style="width:85%;margin-top:14px"></div></div>
+  </main>
+  <footer id="footer"></footer>
+</div>
+
+<script>
+  const RATING = { nsfw: { cls: 'nsfw', label: 'NSFW' }, safe: { cls: 'safe', label: '全年龄' } }
+  const ICON = {
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>'
+  }
+
+  const listEl = document.getElementById('list')
+  let ALL = []
+  let query = ''
+  let rating = 'all' // all | nsfw | safe
+  let firstPaint = true
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  }
+  function monogram(name) { return esc([...String(name ?? '?').trim()][0] || '?') }
+  function prettyHost(u) {
+    try { return new URL(u).host } catch { return String(u).replace(/^https?:\/\//, '').replace(/\/.*$/, '') }
+  }
+
+  function card(e, i) {
+    const rating = RATING[e.contentRating]
+    const ratingPill = rating ? `<span class="pill ${rating.cls}">${rating.label}</span>` : ''
+    const mode = e.readingMode ? ` · ${esc(e.readingMode)}` : ''
+    const hosts = Array.isArray(e.host) ? e.host : []
+    const hostsHtml = hosts.length
+      ? `<div class="hosts">${hosts.map(h => `<span class="host">${ICON.globe}<span>${esc(prettyHost(h))}</span></span>`).join('')}</div>`
+      : ''
+    const cls = firstPaint ? 'card intro' : 'card'
+    const delay = firstPaint ? ` style="animation-delay:${i * 45}ms"` : ''
+    return `
+      <article class="${cls}"${delay}>
+        <div class="chead">
+          <div class="mono-avatar" aria-hidden="true">${monogram(e.name)}</div>
+          <div class="namewrap"><div class="name">${esc(e.name)}</div></div>
+          <div class="badges"><span class="pill">v${esc(e.version)}</span>${ratingPill}</div>
+        </div>
+        <div class="meta">${esc(e.id)} · ${esc(e.type ?? '—')}${mode}</div>
+        ${hostsHtml}
+        <div class="urlrow">
+          <code title="${esc(e.importUrl)}">${esc(e.importUrl)}</code>
+          <button class="copy" data-url="${esc(e.importUrl)}" aria-label="复制 ${esc(e.name)} 的导入地址">${ICON.copy}<span>复制</span></button>
+        </div>
+      </article>`
+  }
+
+  function visible() {
+    return ALL.filter(e => {
+      if (rating !== 'all' && e.contentRating !== rating) return false
+      if (!query) return true
+      const hay = `${e.name} ${e.id} ${(e.host || []).join(' ')}`.toLowerCase()
+      return hay.includes(query)
+    })
+  }
+
+  function render() {
+    const shown = visible()
+    if (!shown.length) {
+      listEl.innerHTML = `<div class="empty">没有匹配的书源${query ? `（关键词「${esc(query)}」）` : ''}</div>`
+    } else {
+      listEl.innerHTML = shown.map(card).join('')
+    }
+    document.getElementById('shown').textContent =
+      shown.length === ALL.length ? `${ALL.length} 个` : `${shown.length} / ${ALL.length}`
+    firstPaint = false
+  }
+
+  function buildChips() {
+    const n = r => (r === 'all' ? ALL.length : ALL.filter(e => e.contentRating === r).length)
+    const defs = [{ k: 'all', label: '全部' }]
+    if (n('nsfw')) defs.push({ k: 'nsfw', label: 'NSFW' })
+    if (n('safe')) defs.push({ k: 'safe', label: '全年龄' })
+    document.getElementById('chips').innerHTML = defs
+      .map(d => `<button class="chip" data-rating="${d.k}" aria-pressed="${d.k === rating}">${d.label}<span class="n">${n(d.k)}</span></button>`)
+      .join('')
+  }
+
+  async function main() {
+    let index
+    try {
+      index = await fetch('sources-index.json', { cache: 'no-store' }).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status)
+        return r.json()
+      })
+    } catch (e) {
+      listEl.innerHTML = `<div class="state err">清单加载失败：${esc(e.message)}</div>`
+      return
+    }
+
+    // 清单已自带展示字段（type/host/readingMode）——只此一次请求，源再多也不逐源拉取。
+    ALL = (index.sources ?? []).map(s => ({ ...s, importUrl: new URL(s.url, location.href).href }))
+
+    document.getElementById('title').textContent = index.name || 'ComicReader 书源'
+    const countEl = document.getElementById('count')
+    countEl.textContent = `${ALL.length} 个书源`
+    countEl.hidden = false
+    document.getElementById('toolbar').hidden = ALL.length === 0
+
+    buildChips()
+    render()
+
+    const updated = index.updatedAt ? new Date(index.updatedAt).toLocaleString() : ''
+    document.getElementById('footer').innerHTML =
+      `清单更新于 ${esc(updated)}　·　由 <code>sources-index.json</code> 自动生成`
+  }
+
+  // 搜索（实时过滤）
+  document.getElementById('q').addEventListener('input', e => {
+    query = e.target.value.trim().toLowerCase()
+    render()
+  })
+
+  // 分级筛选 chips（事件委托）
+  document.getElementById('chips').addEventListener('click', e => {
+    const chip = e.target.closest('.chip')
+    if (!chip) return
+    rating = chip.dataset.rating
+    document.querySelectorAll('#chips .chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.rating === rating)))
+    render()
+  })
+
+  // 复制按钮（事件委托）：图标切换 + 文案 + 颜色反馈
+  listEl.addEventListener('click', async e => {
+    const btn = e.target.closest('.copy')
+    if (!btn) return
+    const restore = btn.innerHTML
+    try {
+      await navigator.clipboard.writeText(btn.dataset.url)
+      btn.innerHTML = ICON.check + '<span>已复制</span>'
+      btn.classList.add('done')
+      setTimeout(() => { btn.innerHTML = restore; btn.classList.remove('done') }, 1600)
+    } catch {
+      const code = btn.closest('.urlrow')?.querySelector('code')
+      if (code) { const r = document.createRange(); r.selectNodeContents(code); const s = getSelection(); s.removeAllRanges(); s.addRange(r) }
+    }
+  })
+
+  main()
+</script>
+</body>
+</html>

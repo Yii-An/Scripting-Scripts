@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "name": "ComicReader 书源仓库",
+  "updatedAt": "2026-06-23T09:09:03.771Z",
+  "sources": [
+    {
+      "id": "jmcomic",
+      "name": "JMComic ZZZ 镜像",
+      "version": 1,
+      "url": "sources/jmcomic.json",
+      "sha256": "060de60ee88107f32881993985710827c3457042549a146716519de8ece5b801",
+      "contentRating": "nsfw",
+      "type": "comic",
+      "host": [
+        "https://jmcomic-zzz.one"
+      ],
+      "readingMode": "webtoon"
+    },
+    {
+      "id": "niaoniao",
+      "name": "鸟鸟韩漫",
+      "version": 1,
+      "url": "sources/niaoniao.json",
+      "sha256": "cce84cc72da01e0ea3bf0145b5a6b6e185b076ca79cae6fc9f079dd4997a2f62",
+      "contentRating": "nsfw",
+      "type": "comic",
+      "host": [
+        "https://nnhanman5.com",
+        "https://nnhm7.com"
+      ],
+      "readingMode": "webtoon"
+    },
+    {
+      "id": "wmtt",
+      "name": "污漫天堂",
+      "version": 1,
+      "url": "sources/wmtt.json",
+      "sha256": "8f3e6b3d04e4a8e18606e3eca830314c46c5904eae06cdd1a2bb27143aa74468",
+      "contentRating": "nsfw",
+      "type": "comic",
+      "host": [
+        "https://wmtt5.com"
+      ],
+      "readingMode": "webtoon"
+    }
+  ]
+}

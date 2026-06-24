@@ -1,0 +1,21 @@
+# Cloudflare Pages 响应头配置（仅 Pages 部署生效；R2 / GitHub raw 不读此文件）。
+#
+# 两条目标：
+#   1. Content-Type 带 charset=utf-8 —— 源文件含中文 name/字段，确保按 UTF-8 解码。
+#   2. 缓存短 + must-revalidate —— App「检查更新」是按 originUrl 重拉、比 version 字段判定升级；
+#      缓存太久会让刚发布的新 version 迟迟检测不到。300s 是「不过分 chatty」与「5 分钟内能发现更新」的平衡。
+#      源文件按 version 单调发布、同 version 字节稳定，短 TTL 不会有一致性问题。
+
+/sources-index.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/sources/*
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+# 查看页：短缓存，改了页面能很快看到。
+/
+  Cache-Control: public, max-age=60, must-revalidate
+/index.html
+  Cache-Control: public, max-age=60, must-revalidate

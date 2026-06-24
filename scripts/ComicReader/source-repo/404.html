@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="color-scheme" content="light dark" />
+<title>404 · 资源不存在</title>
+<!--
+  存在此文件让 Cloudflare Pages 对未匹配路径返回 404（而非默认拿 index.html 当 200 兜底）。
+  对「移除书源」很关键：已删的 sources/<id>.json 应 404，客户端「检查更新」据此判定源已下线，
+  而不是收到 HTML 被当成 JSON 解析失败。精确匹配路由（/、sources-index.json、现存源）不受影响。
+-->
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100dvh; display: grid; place-items: center;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", system-ui, sans-serif;
+    background: #f7f6f4; color: #1c1917;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #0b0a09; color: #f5f3f0; } }
+  .box { text-align: center; padding: 24px; }
+  .code { font-size: 56px; font-weight: 700; letter-spacing: -0.03em; color: #a16207; line-height: 1; }
+  @media (prefers-color-scheme: dark) { .code { color: #e0b057; } }
+  h1 { font-size: 18px; font-weight: 600; margin: 14px 0 6px; }
+  p { font-size: 14px; color: #79716b; margin: 0; }
+  @media (prefers-color-scheme: dark) { p { color: #a8a29e; } }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="code">404</div>
+    <h1>资源不存在</h1>
+    <p>该书源可能已下线或地址有误。<a href="/">返回书源仓库</a></p>
+  </div>
+</body>
+</html>

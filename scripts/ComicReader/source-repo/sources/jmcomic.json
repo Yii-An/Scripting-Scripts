@@ -1,0 +1,241 @@
+{
+  "id": "jmcomic",
+  "name": "JMComic ZZZ 镜像",
+  "type": "comic",
+  "version": 1,
+  "schemaVersion": 1,
+  "_challengeNotes": "全站 Cloudflare Bot Fight Mode：webViewFetcher 接管所有请求，统一走同源 linkActivated 导航静默过 CF。successMarkers 全部命中（AND）才判定拿到真页面；不配则每页走 unknown-fallback 慢路径。",
+  "host": "https://jmcomic-zzz.one",
+  "charset": "utf-8",
+  "languages": ["zh"],
+  "contentRating": "nsfw",
+
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+  },
+  "cookieJar": true,
+  "rateLimit": { "qps": 4, "maxConcurrent": 4 },
+
+  "comic": {
+    "readingMode": "webtoon",
+    "maxImageConcurrency": 4
+  },
+
+  "challenge": {
+    "kind": "cloudflare",
+    "webview": {
+      "successMarkers": ["/album/\\d+", "class=\"[^\"]*\\b(?:thumb-overlay-albums|list-col|video-title)\\b|data-original="],
+      "maxWaitMs": 30000
+    }
+  },
+
+  "search": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/search/photos?search_query={{keyword|encode}}&page={{page}}"
+    },
+    "parse": {
+      "list": "div.row div.thumb-overlay-albums, div.row div.list-col, .video-list .col-mb-12",
+      "fields": {
+        "id": "a[href*='/album/']@attr=href##.*?/album/(\\d+).*##$1",
+        "title": "span.video-title@text || .title@text || img@attr=title",
+        "cover": "img@attr=data-original || img@attr=data-src || img@attr=src",
+        "url": "a[href*='/album/']@attr=href",
+        "tags": "div.tags a@text || .title-truncate a@text"
+      },
+      "pagination": {
+        "kind": "pageParam",
+        "param": "page",
+        "start": 1
+      },
+      "stopCondition": { "emptyResult": true, "maxPages": 50 }
+    }
+  },
+
+  "listings": [
+    {
+      "id": "albums",
+      "name": "全部",
+      "kind": "grid",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/albums/{{filters.category}}?o={{filters.sort}}&t={{filters.time}}"
+      },
+      "filters": [
+        {
+          "id": "category",
+          "name": "分类",
+          "default": "",
+          "options": [
+            { "value": "", "name": "全部" },
+            { "value": "doujin", "name": "同人" },
+            { "value": "single", "name": "单本" },
+            { "value": "short", "name": "短篇" },
+            { "value": "hanman", "name": "韩漫" },
+            { "value": "hanmansfw", "name": "一般向韩漫" },
+            { "value": "meiman", "name": "美漫" },
+            { "value": "another", "name": "其他" }
+          ]
+        },
+        {
+          "id": "sort",
+          "name": "排序",
+          "default": "mr",
+          "options": [
+            { "value": "mr", "name": "最新" },
+            { "value": "mv", "name": "最多点阅" },
+            { "value": "mp", "name": "最多图片" },
+            { "value": "tr", "name": "最高评分" },
+            { "value": "md", "name": "最多评论" },
+            { "value": "tf", "name": "最爱" }
+          ]
+        },
+        {
+          "id": "time",
+          "name": "时间",
+          "default": "a",
+          "options": [
+            { "value": "a", "name": "全部" },
+            { "value": "t", "name": "今天" },
+            { "value": "w", "name": "本周" },
+            { "value": "m", "name": "本月" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.row div.thumb-overlay-albums, div.row div.list-col, .video-list .col-mb-12",
+        "fields": {
+          "id": "a[href*='/album/']@attr=href##.*?/album/(\\d+).*##$1",
+          "title": "span.video-title@text || .title@text || img@attr=title",
+          "cover": "img@attr=data-original || img@attr=data-src || img@attr=src",
+          "url": "a[href*='/album/']@attr=href"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/albums/{{filters.category}}?o={{filters.sort}}&t={{filters.time}}&page={{page}}"
+        }
+      }
+    },
+    {
+      "id": "serialization",
+      "name": "每日连载",
+      "kind": "grid",
+      "_notes": "/serialization/{day} 单页全量、无分页；卡片 DOM 与 /albums 完全一致，复用同一套 fields。",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/serialization/{{filters.day}}"
+      },
+      "filters": [
+        {
+          "id": "day",
+          "name": "星期",
+          "default": "0",
+          "options": [
+            { "value": "1", "name": "周一" },
+            { "value": "2", "name": "周二" },
+            { "value": "3", "name": "周三" },
+            { "value": "4", "name": "周四" },
+            { "value": "5", "name": "周五" },
+            { "value": "6", "name": "周六" },
+            { "value": "7", "name": "周日" },
+            { "value": "0", "name": "已完结" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.row div.thumb-overlay-albums, div.row div.list-col, .video-list .col-mb-12",
+        "fields": {
+          "id": "a[href*='/album/']@attr=href##.*?/album/(\\d+).*##$1",
+          "title": "span.video-title@text || .title@text || img@attr=title",
+          "cover": "img@attr=data-original || img@attr=data-src || img@attr=src",
+          "url": "a[href*='/album/']@attr=href"
+        }
+      }
+    }
+  ],
+
+  "detail": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/album/{{book.id}}"
+    },
+    "_coverNotes": "封面不从 DOM 抓（站点 JS 的 CDN 切换会把 src 暂换成 blank.jpg，存在竞态），直接按 URL 规律构造 _3x4 变体：{cdn}/media/albums/{专辑id}_3x4.jpg。实测 _3x4 是 400×533（3:4、与列表卡片同款），原图 {id}.jpg 反而只有 300×300 方图——塞进 3:4 框会糊且变形。",
+    "_statusNotes": "JM 没有独立的状态字段，「連載中/完結」只是上传者打的标签——只认本书自己标签区（span[itemprop=genre][data-type=tags]）里的；相关作品轮播与侧栏卡片上他书的状态徽章、评论正文都含这些字样，全文搜会误判。没打标签的书（如部分韩漫、全部单本）状态就是 unknown，这是源站真实数据。",
+    "parse": {
+      "fields": {
+        "title": "h1#book-name@text || h1.book-name@text",
+        "cover": "@js: var m = ctx.response.url.match(/\\/album\\/(\\d+)/); return m ? 'https://cdn-msp.jmcomic-zzz.one/media/albums/' + m[1] + '_3x4.jpg' : null;",
+        "author": "span[itemprop='author'][data-type='author'] a@text",
+        "description": "meta[property='og:description']@attr=content || h2.p-t-5.p-b-5@text",
+        "tags": "span[itemprop='genre'][data-type='tags'] a@text",
+        "updateTime": "@js: var b=ctx.response.body; var m=b.match(/更新日期\\s*[:：]\\s*(\\d{4}-\\d{2}-\\d{2})/); if (m) return m[1]; var m2=b.match(/上架日期\\s*[:：]\\s*(\\d{4}-\\d{2}-\\d{2})/); return m2 ? m2[1] : null;",
+        "status": "@js: var els = document.querySelectorAll(\"span[itemprop='genre'][data-type='tags'] a\"); var s = ''; for (var i = 0; i < els.length; i++) s += els[i].textContent + ','; if (s.indexOf('連載中') > -1 || s.indexOf('连载中') > -1) return 'ongoing'; if (s.indexOf('完結') > -1 || s.indexOf('完结') > -1) return 'completed'; return 'unknown';"
+      }
+    },
+    "lazyLoad": {
+      "strategy": "waitFor",
+      "waitFor": { "kind": "expr", "expr": "@js: return document.querySelectorAll('a[href*=\"/photo/\"], a[data-href*=\"/photo/\"]').length > 0" },
+      "maxWaitMs": 10000,
+      "pollIntervalMs": 200
+    }
+  },
+
+  "chapter": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/album/{{book.id}}"
+    },
+    "_listNotes": "连载本章节在 div.episode ul（双布局各一份，靠 id 去重归一）；单本没有 episode 列表，回落到移动布局（col-xs-12）的開始閱讀按钮——PC 布局还有个同 id 的「分頁閱讀」按钮，不能宽匹配 btn-primary。宽匹配 a[href*='/photo/'] 会混入更新时间线与封面遮罩锚点，勿用。",
+    "parse": {
+      "list": "div.episode ul a[href*='/photo/'] || div.col-xs-12 a.btn.btn-primary[href*='/photo/']",
+      "fields": {
+        "id": "@attr=data-href##.*?/photo/(\\d+).*##$1 || @attr=href##.*?/photo/(\\d+).*##$1",
+        "title": "@attr=title || @text",
+        "url": "@attr=data-href || @attr=href",
+        "number": "@attr=data-href##.*?/photo/(\\d+).*##$1 || @attr=href##.*?/photo/(\\d+).*##$1"
+      }
+    }
+  },
+
+  "page": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/photo/{{chapter.id}}"
+    },
+    "parse": {
+      "pages": "div.scramble-page img@attr=data-original || div.center img.lazy-img@attr=data-original || img.scramble-page@attr=data-original"
+    },
+    "lazyLoad": {
+      "strategy": "waitFor",
+      "waitFor": {
+        "kind": "expr",
+        "expr": "@js: return Array.from(document.querySelectorAll('div.scramble-page img')).some(function(im){ var v=im.getAttribute('data-original')||im.src||''; return /^https?:\\/\\//.test(v) && !/blank\\.jpg/i.test(v) })"
+      },
+      "maxWaitMs": 15000,
+      "pollIntervalMs": 250
+    }
+  },
+
+  "_imageDecodeNotes": "JM 解扰以 photo id（章节 id，即 /photo/{id}）为 key，不是专辑 id——第 1 话的 photo id 常等于专辑 id，用错 key 只在第 1 话碰巧正确，第 2 话起切片错位。分档阈值（220980/268850/421926）同样按 photo id 判。",
+  "imagePipeline": {
+    "imageDecode": "@js: var pid = Number(ctx.chapterId); if (!isFinite(pid) || pid < 220980) return null; var num; if (pid < 268850) { num = 10; } else { var hex = ctx.md5(String(pid) + ctx.filename); var n = hex.charCodeAt(hex.length - 1); var mod = pid < 421926 ? 10 : 8; num = (n % mod) * 2 + 2; } if (num <= 1) return null; var H = ctx.height; var sliceH = Math.floor(H / num); var rem = H - sliceH * num; var out = []; for (var i = 0; i < num; i++) { if (i === 0) { out.push({ srcY: H - sliceH - rem, dstY: 0, copyH: sliceH + rem }); } else { out.push({ srcY: H - sliceH * (i + 1) - rem, dstY: sliceH * i + rem, copyH: sliceH }); } } return out;",
+    "headers": {
+      "Referer": "https://jmcomic-zzz.one/"
+    },
+    "refererStrategy": "fixed",
+    "allowedImageHosts": [
+      "jmcomic-zzz.one",
+      "cdn-msp.jmapiproxy1.cc",
+      "cdn-msp.jmapiproxy2.cc",
+      "cdn-msp.jmapiproxy3.cc",
+      "cdn-msp.jmapiproxy4.cc",
+      "cdn-msp2.jmapiproxy1.cc",
+      "cdn-msp2.jmapiproxy2.cc",
+      "cdn-msp3.18comic.vip",
+      "cdn-msp3.18comic.org"
+    ],
+    "retry": { "count": 2, "backoffMs": 500 }
+  }
+}

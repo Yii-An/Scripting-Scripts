@@ -1,0 +1,23 @@
+{
+  "name": "ComicReader",
+  "intentInputTypes": [],
+  "version": "1.0.0",
+  "icon": "books.vertical",
+  "author": {
+    "homepage": "https://github.com/Yii-An",
+    "email": "193238090+Yii-An@users.noreply.github.com",
+    "name": "YiiAn"
+  },
+  "contributors": [],
+  "color": "#5856D6",
+  "localizedNames": {
+    "en": "Comic Reader",
+    "zh": "漫画阅读器"
+  },
+  "localizedDescriptions": {
+    "en": "Comic source-driven reader",
+    "zh": "图源驱动的漫画阅读器"
+  },
+  "runInApp": false,
+  "description": "图源驱动的漫画阅读器"
+}

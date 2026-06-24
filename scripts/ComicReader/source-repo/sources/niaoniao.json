@@ -1,0 +1,216 @@
+{
+  "id": "niaoniao",
+  "name": "鸟鸟韩漫",
+  "type": "comic",
+  "version": 1,
+  "schemaVersion": 1,
+  "host": ["https://nnhanman5.com", "https://nnhm7.com"],
+  "charset": "utf-8",
+  "languages": ["zh"],
+  "contentRating": "nsfw",
+
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9"
+  },
+  "cookieJar": true,
+  "rateLimit": { "qps": 4, "maxConcurrent": 4 },
+
+  "comic": {
+    "readingMode": "webtoon",
+    "maxImageConcurrency": 4
+  },
+
+  "search": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/search/{{keyword|encode}}"
+    },
+    "parse": {
+      "list": "div.imgBox ul.col_3_1 > li",
+      "fields": {
+        "id": "a.ImgA@attr=href##.*/comic/([^/.]+)\\.html##$1",
+        "title": "a.ImgA@attr=title || a.txtA@attr=title",
+        "cover": "a.ImgA picture source@attr=srcset || a.ImgA picture img@attr=src",
+        "url": "a.ImgA@attr=href",
+        "updateTime": "span.info@text"
+      }
+    }
+  },
+
+  "listings": [
+    {
+      "id": "updates",
+      "name": "更新",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/update{{filters.scope}}" },
+      "filters": [
+        {
+          "id": "scope",
+          "name": "范围",
+          "default": "",
+          "options": [
+            { "value": "", "name": "最新更新" },
+            { "value": "/newbook", "name": "新书发布" },
+            { "value": "/recommend", "name": "推荐漫画" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.itemBox",
+        "fields": {
+          "id": "div.itemImg a@attr=href##.*/comic/([^/.]+)\\.html##$1",
+          "title": "div.itemTxt a.title@text || div.itemTxt a.title@attr=title",
+          "cover": "div.itemImg picture source@attr=srcset || div.itemImg picture img@attr=src",
+          "url": "div.itemImg a@attr=href",
+          "updateTime": "span.date@text##.*?(\\d{4}-\\d{2}-\\d{2}).*##$1"
+        }
+      }
+    },
+    {
+      "id": "rank",
+      "name": "排行",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/ranking/{{filters.period}}" },
+      "filters": [
+        {
+          "id": "period",
+          "name": "周期",
+          "default": "weekly",
+          "options": [
+            { "value": "daily", "name": "日榜" },
+            { "value": "weekly", "name": "周榜" },
+            { "value": "monthly", "name": "月榜" },
+            { "value": "all", "name": "总榜" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.itemBox",
+        "fields": {
+          "id": "div.itemImg a@attr=href##.*/comic/([^/.]+)\\.html##$1",
+          "title": "div.itemTxt a.title@text || div.itemTxt a.title@attr=title",
+          "cover": "div.itemImg picture source@attr=srcset || div.itemImg picture img@attr=src",
+          "url": "div.itemImg a@attr=href",
+          "updateTime": "span.date@text"
+        }
+      }
+    },
+    {
+      "id": "category",
+      "name": "分类",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/comics/all/ob/{{filters.sort}}/st/{{filters.status}}" },
+      "filters": [
+        {
+          "id": "status",
+          "name": "进度",
+          "default": "all",
+          "options": [
+            { "value": "all", "name": "全部" },
+            { "value": "completed", "name": "已完结" },
+            { "value": "serialized", "name": "更新中" }
+          ]
+        },
+        {
+          "id": "sort",
+          "name": "排序",
+          "default": "time",
+          "options": [
+            { "value": "time", "name": "按时间" },
+            { "value": "hits", "name": "按阅读" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.imgBox ul.col_3_1 > li",
+        "fields": {
+          "id": "a.ImgA@attr=href##.*/comic/([^/.]+)\\.html##$1",
+          "title": "a.ImgA@attr=title || a.txtA@attr=title",
+          "cover": "a.ImgA picture source@attr=srcset || a.ImgA picture img@attr=src",
+          "url": "a.ImgA@attr=href",
+          "updateTime": "span.info@text"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/comics/all/ob/{{filters.sort}}/st/{{filters.status}}/page/{{page}}"
+        }
+      }
+    }
+  ],
+
+  "detail": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/comic/{{book.id}}.html"
+    },
+    "parse": {
+      "fields": {
+        "title": "div.Introduct h1@text##^《(.+)》$##$1",
+        "cover": "div#Cover picture source@attr=srcset || div#Cover img@attr=src",
+        "author": "div.Introduct_Sub p.txtItme:nth-of-type(2)@text##^\\s*作者[:：]?\\s*##",
+        "tags": "div.Introduct_Sub p.txtItme:nth-of-type(3) a@text",
+        "description": "p.txtDesc@text##介绍[:：]?##",
+        "updateTime": "div.Introduct_Sub span.date@text##.*?(\\d{2}/\\d{2}/\\d{4}).*##$1",
+        "status": "@js: var b=ctx.response.body||''; if(b.indexOf('已完结')>-1||b.indexOf('完结')>-1){return 'completed';} if(b.indexOf('连载中')>-1||b.indexOf('更新中')>-1){return 'ongoing';} return 'unknown';"
+      }
+    }
+  },
+
+  "chapter": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/comic/{{book.id}}.html"
+    },
+    "parse": {
+      "list": "ul#mh-chapter-list-ol-0 > li",
+      "fields": {
+        "id": "a@attr=href##.*/chapter-(\\d+)\\.html##$1",
+        "title": "a span@text || a@text",
+        "url": "a@attr=href",
+        "number": "a span@text##.*?(\\d+).*##$1"
+      }
+    }
+  },
+
+  "page": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/comic/{{book.id}}/chapter-{{chapter.id}}.html"
+    },
+    "parse": {
+      "pages": "div#m_r_imgbox_0 img.lazy@attr=data-original"
+    }
+  },
+
+  "imagePipeline": {
+    "headers": {
+      "Referer": "https://nnhanman5.com/"
+    },
+    "refererStrategy": "fixed",
+    "allowedImageHosts": [
+      "p1.jmpic.xyz",
+      "p2.jmpic.xyz",
+      "p3.jmpic.xyz",
+      "p4.jmpic.xyz",
+      "p5.jmpic.xyz",
+      "p6.jmpic.xyz",
+      "p7.jmpic.xyz",
+      "p8.jmpic.xyz",
+      "p9.jmpic.xyz",
+      "p10.jmpic.xyz",
+      "p1.nnpic.xyz",
+      "p2.nnpic.xyz",
+      "p3.nnpic.xyz",
+      "p4.nnpic.xyz",
+      "p5.nnpic.xyz",
+      "p6.nnpic.xyz",
+      "p7.nnpic.xyz",
+      "p8.nnpic.xyz",
+      "p9.nnpic.xyz",
+      "p10.nnpic.xyz"
+    ],
+    "retry": { "count": 2, "backoffMs": 500 }
+  }
+}

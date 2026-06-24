@@ -1,0 +1,251 @@
+{
+  "id": "wmtt",
+  "name": "污漫天堂",
+  "type": "comic",
+  "version": 1,
+  "schemaVersion": 1,
+  "host": "https://wmtt5.com",
+  "charset": "utf-8",
+  "iconUrl": "https://wmtt5.com/imgs/logo.png",
+  "languages": ["zh"],
+  "contentRating": "nsfw",
+
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9"
+  },
+  "cookieJar": true,
+  "rateLimit": { "qps": 4, "maxConcurrent": 3 },
+
+  "comic": {
+    "readingMode": "webtoon",
+    "maxImageConcurrency": 4
+  },
+
+  "vars": {
+    "coverHosts": "p1.jmpic.xyz,p2.jmpic.xyz,p3.jmpic.xyz,p4.jmpic.xyz,p5.jmpic.xyz",
+    "pageHosts": "p1.nnpic.xyz,p2.nnpic.xyz,p3.nnpic.xyz,p4.nnpic.xyz,p5.nnpic.xyz,p6.nnpic.xyz,p7.nnpic.xyz,p8.nnpic.xyz,p9.nnpic.xyz,p10.nnpic.xyz"
+  },
+
+  "search": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/searchmanga/{{keyword|encode}}/ob/{{filters.sort}}/st/{{filters.status}}"
+    },
+    "filters": [
+      {
+        "id": "status",
+        "name": "进度",
+        "default": "all",
+        "options": [
+          { "value": "all", "name": "全部" },
+          { "value": "completed", "name": "已完结" },
+          { "value": "serialized", "name": "更新中" }
+        ]
+      },
+      {
+        "id": "sort",
+        "name": "排序",
+        "default": "time",
+        "options": [
+          { "value": "time", "name": "按时间" },
+          { "value": "hits", "name": "按阅读" }
+        ]
+      }
+    ],
+    "parse": {
+      "list": "a.module-poster-item.module-item",
+      "fields": {
+        "id": "@attr=href##.*?/mangaread/(\\d+)\\.html.*##$1",
+        "title": "div.module-poster-item-title@text || @attr=title",
+        "cover": "img.lazyload@attr=data-original",
+        "updateTime": "div.module-item-note@text"
+      },
+      "pagination": {
+        "kind": "page",
+        "urlTemplate": "{{host}}/searchmanga/{{keyword|encode}}/ob/{{filters.sort}}/st/{{filters.status}}/page/{{page}}",
+        "stopCondition": "@js: var b=ctx.response&&ctx.response.body||''; return b.indexOf('module-poster-item module-item') < 0;"
+      }
+    }
+  },
+
+  "listings": [
+    {
+      "id": "updates",
+      "name": "更新",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/newmanga{{filters.scope}}" },
+      "filters": [
+        {
+          "id": "scope",
+          "name": "范围",
+          "default": "",
+          "options": [
+            { "value": "", "name": "最新更新" },
+            { "value": "/newmanga", "name": "新书发布" },
+            { "value": "/recommend", "name": "推荐漫画" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "a.module-poster-item.module-item",
+        "fields": {
+          "id": "@attr=href##.*?/mangaread/(\\d+)\\.html.*##$1",
+          "title": "div.module-poster-item-title@text || @attr=title",
+          "cover": "img.lazyload@attr=data-original",
+          "updateTime": "div.module-item-note@text"
+        }
+      }
+    },
+    {
+      "id": "rank",
+      "name": "排行",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/mangarank/{{filters.period}}" },
+      "filters": [
+        {
+          "id": "period",
+          "name": "周期",
+          "default": "weekly",
+          "options": [
+            { "value": "daily", "name": "日榜" },
+            { "value": "weekly", "name": "周榜" },
+            { "value": "monthly", "name": "月榜" },
+            { "value": "all", "name": "总榜" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "a.module-poster-item.module-item",
+        "fields": {
+          "id": "@attr=href##.*?/mangaread/(\\d+)\\.html.*##$1",
+          "title": "div.module-poster-item-title@text || @attr=title",
+          "cover": "img.lazyload@attr=data-original"
+        }
+      }
+    },
+    {
+      "id": "category",
+      "name": "分类",
+      "kind": "grid",
+      "request": { "action": "fetch", "url": "{{host}}/mangacata/{{filters.type}}/ob/{{filters.sort}}/st/{{filters.status}}" },
+      "filters": [
+        {
+          "id": "type",
+          "name": "类型",
+          "default": "all",
+          "options": [
+            { "value": "all", "name": "全部" },
+            { "value": "韩漫", "name": "韩漫" },
+            { "value": "日漫", "name": "日漫" },
+            { "value": "3D漫画", "name": "3D漫画" },
+            { "value": "真人漫画", "name": "真人漫画" },
+            { "value": "短篇", "name": "短篇" }
+          ]
+        },
+        {
+          "id": "status",
+          "name": "进度",
+          "default": "all",
+          "options": [
+            { "value": "all", "name": "全部" },
+            { "value": "completed", "name": "已完结" },
+            { "value": "serialized", "name": "更新中" }
+          ]
+        },
+        {
+          "id": "sort",
+          "name": "排序",
+          "default": "time",
+          "options": [
+            { "value": "time", "name": "按时间" },
+            { "value": "hits", "name": "按阅读" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "a.module-poster-item.module-item",
+        "fields": {
+          "id": "@attr=href##.*?/mangaread/(\\d+)\\.html.*##$1",
+          "title": "div.module-poster-item-title@text || @attr=title",
+          "cover": "img.lazyload@attr=data-original",
+          "updateTime": "div.module-item-note@text"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/mangacata/{{filters.type}}/ob/{{filters.sort}}/st/{{filters.status}}/page/{{page}}",
+          "stopCondition": "@js: var b=ctx.response&&ctx.response.body||''; return b.indexOf('module-poster-item module-item') < 0;"
+        }
+      }
+    }
+  ],
+
+  "detail": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/mangaread/{{book.id}}.html"
+    },
+    "parse": {
+      "fields": {
+        "title": "div.module-info-heading h1@text##^《(.*)》$##$1",
+        "cover": "div.module-info-poster img.lazyload@attr=data-original",
+        "description": "div.module-info-introduction-content p@text",
+        "author": "@js: var m=ctx.response.body.match(/<span[^>]*class=\"module-info-item-title\"[^>]*>作者：<\\/span>[\\s\\S]*?<a[^>]*>([^<]+)<\\/a>/); return m?m[1].trim():null;",
+        "tags": "div.module-info-tag div.module-info-tag-link a@text",
+        "status": "@js: var b=ctx.response.body||''; if(b.indexOf('已完结')>-1||b.indexOf('完结')>-1){return 'completed';} if(b.indexOf('连载中')>-1||b.indexOf('更新中')>-1){return 'ongoing';} return 'unknown';"
+      }
+    }
+  },
+
+  "chapter": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/mangaread/{{book.id}}.html"
+    },
+    "parse": {
+      "list": "div.module-list#panel1 a.module-play-list-link",
+      "fields": {
+        "id": "@attr=href##.*?/mangaread/\\d+/([A-Za-z0-9]+)\\.html.*##$1",
+        "title": "span@text",
+        "url": "@attr=href",
+        "number": "@attr=title##.*?第\\s*(\\d+(?:\\.\\d+)?)\\s*[話话].*##$1"
+      }
+    }
+  },
+
+  "page": {
+    "request": {
+      "action": "fetch",
+      "url": "{{host}}/mangaread/{{book.id}}/{{chapter.id}}.html"
+    },
+    "parse": {
+      "pages": "img.lazy@attr=data-original"
+    }
+  },
+
+  "imagePipeline": {
+    "headers": {
+      "Referer": "https://wmtt5.com/"
+    },
+    "refererStrategy": "fixed",
+    "allowedImageHosts": [
+      "p1.jmpic.xyz",
+      "p2.jmpic.xyz",
+      "p3.jmpic.xyz",
+      "p4.jmpic.xyz",
+      "p5.jmpic.xyz",
+      "p1.nnpic.xyz",
+      "p2.nnpic.xyz",
+      "p3.nnpic.xyz",
+      "p4.nnpic.xyz",
+      "p5.nnpic.xyz",
+      "p6.nnpic.xyz",
+      "p7.nnpic.xyz",
+      "p8.nnpic.xyz",
+      "p9.nnpic.xyz",
+      "p10.nnpic.xyz"
+    ],
+    "retry": { "count": 2, "backoffMs": 500 }
+  }
+}
