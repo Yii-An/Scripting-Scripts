@@ -1,5 +1,6 @@
 import { Button, HStack, Image, NavigationLink, ProgressView, Spacer, Text, VStack, ZStack, useEffect, useMemo, useRef, useState } from 'scripting'
 
+import { ExitButton } from '../components/ExitButton'
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { type CheckStatus, checkBatch } from '../services/updateChecker'
 import { findSourceById } from '../sources'
@@ -77,6 +78,7 @@ export function BookshelfScreen() {
       navigationTitle="书架"
       navigationDestination={detailNavDestination}
       toolbar={{
+        topBarLeading: <ExitButton />,
         topBarTrailing: (
           <HStack spacing={12}>
             <Button

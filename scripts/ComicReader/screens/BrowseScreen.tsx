@@ -28,6 +28,7 @@ import {
 } from 'scripting'
 
 import { BookCard } from '../components/BookCard'
+import { ExitButton } from '../components/ExitButton'
 import { FilterPicker } from '../components/FilterPicker'
 import { ScrollList, ScrollSection, useScrollAnchor } from '../components/ScrollList'
 import { type ListingPageState, executeListing, initialListingState, resolveFilters } from '../services/listingExecutor'
@@ -77,7 +78,7 @@ export function BrowseScreen() {
 
   if (sources.length === 0) {
     return (
-      <ScrollList navigationTitle="浏览">
+      <ScrollList navigationTitle="浏览" toolbar={{ topBarLeading: <ExitButton /> }}>
         <ScrollSection>
           <VStack alignment="leading" spacing={6}>
             <Text font="headline">暂无可用分类</Text>
@@ -92,7 +93,12 @@ export function BrowseScreen() {
       </ScrollList>
     )
   }
-  if (!currentSource) return <ScrollList navigationTitle="浏览">{null}</ScrollList>
+  if (!currentSource)
+    return (
+      <ScrollList navigationTitle="浏览" toolbar={{ topBarLeading: <ExitButton /> }}>
+        {null}
+      </ScrollList>
+    )
 
   return <BrowseBody source={currentSource} sources={sources} onChangeSource={setSelectedSourceId} />
 }
@@ -324,6 +330,7 @@ function BrowseBody({ source, sources, onChangeSource }: { source: Source; sourc
   return (
     <ScrollList
       navigationTitle="浏览"
+      toolbar={{ topBarLeading: <ExitButton /> }}
       scrollAnchor={scroll}
       visibleTargetIds={{ onChanged: onVisibleChanged }}
       overlay={

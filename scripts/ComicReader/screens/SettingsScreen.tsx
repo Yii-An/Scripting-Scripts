@@ -4,6 +4,7 @@
 
 import { Button, type Color, HStack, Image, NavigationLink, Rectangle, Script, Spacer, Stepper, Text, VStack, useState } from 'scripting'
 
+import { ExitButton } from '../components/ExitButton'
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { getAllSourcesIncludingDisabled } from '../sources'
 import { getBookshelf } from '../storage/bookshelf'
@@ -81,7 +82,7 @@ export function SettingsScreen() {
     // 灰底是「白卡片浮在灰底上」的原生 grouped 视觉的前提——浅色模式下卡片本身是白的，
     // 不垫灰底卡片会隐形。背景用 Rectangle + ignoresSafeArea 而非直接给色值：
     // 色值背景只盖 ScrollView 自身边界，large title / 安全区下面会露出白底，出现生硬的白灰分界。
-    <ScrollList navigationTitle="设置" background={<Rectangle fill="systemGroupedBackground" ignoresSafeArea />}>
+    <ScrollList navigationTitle="设置" toolbar={{ topBarLeading: <ExitButton /> }} background={<Rectangle fill="systemGroupedBackground" ignoresSafeArea />}>
       {/* 状态头：品牌 + 一句同步/计数总览。plain 浮在灰底上、不套白卡，像 large title 下的页眉。 */}
       <ScrollSection variant="plain">
         <BrandHeader
