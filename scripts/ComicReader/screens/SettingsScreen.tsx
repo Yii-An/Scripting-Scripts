@@ -8,7 +8,7 @@ import { ExitButton } from '../components/ExitButton'
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { getAllSourcesIncludingDisabled } from '../sources'
 import { getBookshelf } from '../storage/bookshelf'
-import { clearAllDeviceData, flushAndExit } from '../storage/bookshelfSync'
+import { clearAllDeviceData } from '../storage/bookshelfSync'
 import { DOWNLOAD_CONCURRENCY_MAX, DOWNLOAD_CONCURRENCY_MIN, getDownloadConcurrency, setDownloadConcurrency } from '../storage/settings'
 import { DownloadsScreen } from './DownloadsScreen'
 import { LogScreen } from './LogScreen'
@@ -35,8 +35,6 @@ const DOWNLOADS_DESTINATION = <DownloadsScreen />
 export function SettingsScreen() {
   // FileManager.isiCloudEnabled 是同步只读字段；脚本生命周期内不会变 —— 直接读即可。
   const iCloudOn = FileManager.isiCloudEnabled
-  // 退出按钮的 "正在保存…" 状态：点击 → flushPending → Script.exit。防双击 + 给"正在上传 iCloud"反馈。
-  const [exiting, setExiting] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [concurrency, setConcurrency] = useState(getDownloadConcurrency())
   // 状态头快照：进入设置页读一次即可（停留期间计数变化对总览不敏感，无需订阅 store）。
@@ -44,14 +42,9 @@ export function SettingsScreen() {
   const bookCount = getBookshelf().length
   const sourceCount = getAllSourcesIncludingDisabled().length
 
-  async function exitWithFlush() {
-    if (exiting || clearing) return
-    setExiting(true)
-    await flushAndExit()
-  }
   // 工厂重置：两步确认 → 清本设备全部数据 → 直接 Script.exit（不能 flush，否则会把内存里的旧数据回写）。
   async function clearAllData() {
-    if (clearing || exiting) return
+    if (clearing) return
     const ok1 = await Dialog.confirm({
       title: '清除全部设备数据',
       message:
@@ -125,20 +118,13 @@ export function SettingsScreen() {
         </NavigationLink>
       </ScrollSection>
 
-      {/* 退出：与上方一致的左对齐图标行（不再全宽居中"长条"）。中性灰徽章——它不删数据，红色留给真正危险的清除。 */}
-      <ScrollSection footer="退出后书架与进度仍保留，下次打开自动恢复。" dividerInset={DIVIDER_INSET}>
-        <Button action={exitWithFlush} disabled={exiting || clearing}>
-          <SettingsRow icon="rectangle.portrait.and.arrow.right" tint={TINT_GRAY} label={exiting ? '保存中…' : '退出脚本'} />
-        </Button>
-      </ScrollSection>
-
       {/* 危险操作：独立分组 + 红徽章红字的行，把"危险"信号留给真正不可逆的清除。 */}
       <ScrollSection
         header="危险操作"
         footer="永久删除本设备上的全部 ComicReader 数据（书架 / 进度 / 下载 / 缓存 / 书源 / 设备身份），不可恢复。同一 iCloud 账号下需逐台清除。"
         dividerInset={DIVIDER_INSET}
       >
-        <Button action={clearAllData} disabled={clearing || exiting}>
+        <Button action={clearAllData} disabled={clearing}>
           <SettingsRow icon="trash.fill" tint={ERR} label={clearing ? '清除中…' : '清除全部设备数据'} labelColor={ERR} />
         </Button>
       </ScrollSection>

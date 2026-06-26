@@ -37,6 +37,7 @@ import { getEnabledSources, subscribeSources } from '../sources'
 import { subscribeSettings } from '../storage/settings'
 import type { Book, ListingModule, Source } from '../types/source'
 import { DetailScreen } from './DetailScreen'
+import { SearchScreen } from './SearchScreen'
 import { SourceListScreen } from './SourceListScreen'
 
 const MUTED: `#${string}` = '#8E8E93'
@@ -327,10 +328,21 @@ function BrowseBody({ source, sources, onChangeSource }: { source: Source; sourc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleBounds, totalBooks, fetch.status, currentListing])
 
+  // 顶栏「搜索」destination：把当前书源作为默认搜索源带进搜索页。必须 useMemo 锁住（key=source.id）——
+  // BrowseBody 因 visibility / loadMore 高频重渲，不缓存会让 bridge 把已 push 的 SearchScreen 弹回（同书架页做法）。
+  const searchDestination = useMemo(() => <SearchScreen defaultSourceId={source.id} />, [source.id])
+
   return (
     <ScrollList
       navigationTitle="浏览"
-      toolbar={{ topBarLeading: <ExitButton /> }}
+      toolbar={{
+        topBarLeading: <ExitButton />,
+        topBarTrailing: (
+          <NavigationLink destination={searchDestination}>
+            <Text foregroundStyle={ACCENT}>搜索</Text>
+          </NavigationLink>
+        )
+      }}
       scrollAnchor={scroll}
       visibleTargetIds={{ onChanged: onVisibleChanged }}
       overlay={

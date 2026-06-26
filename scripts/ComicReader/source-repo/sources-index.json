@@ -1,8 +1,21 @@
 {
   "schemaVersion": 1,
   "name": "ComicReader 书源仓库",
-  "updatedAt": "2026-06-23T09:09:03.771Z",
+  "updatedAt": "2026-06-26T06:36:38.578Z",
   "sources": [
+    {
+      "id": "bakamh",
+      "name": "巴卡漫画",
+      "version": 1,
+      "url": "sources/bakamh.json",
+      "sha256": "140eeb7d9c10de67cdb114c41588e13c9d2145f1fbc3544595bb3e8d9cd25275",
+      "contentRating": "nsfw",
+      "type": "comic",
+      "host": [
+        "https://bakamh.com"
+      ],
+      "readingMode": "webtoon"
+    },
     {
       "id": "jmcomic",
       "name": "JMComic ZZZ 镜像",

@@ -11,6 +11,7 @@
 import * as imageStore from '../storage/cache/imageStore'
 import { offlineFileBase, offlineNamespace } from '../storage/offline/downloadStore'
 import type { Source } from '../types/source'
+import { getClearanceCookie } from './cfClearance'
 import { buildImageHeaders } from './imageHeaders'
 import { log } from './logger'
 
@@ -153,9 +154,18 @@ function fetchToAuto(source: Source, pageUrl: string): Promise<{ path: string; b
     namespace: autoNamespace(source.id),
     fileBaseName: urlFileBase(pageUrl),
     url: pageUrl,
-    headers: buildImageHeaders(source),
+    headers: imageHeadersWithClearance(source, pageUrl),
     timeoutSeconds: IMAGE_TIMEOUT_S
   })
+}
+
+// 图片 headers + 该 origin 已存的 cf_clearance。CF 保护的图床（如 bakamh.com/wp-content）原生取图
+// 不带 cf_clearance 会 403 / 拿到挑战页（非图片字节流），裂图。令牌由页面过盾时 persistClearance 落盘。
+function imageHeadersWithClearance(source: Source, url: string): Record<string, string> {
+  const headers = buildImageHeaders(source)
+  const cookie = getClearanceCookie(url)
+  if (cookie) headers.Cookie = cookie
+  return headers
 }
 
 /**

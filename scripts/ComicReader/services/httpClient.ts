@@ -1,10 +1,12 @@
-// fetch 封装。普通源走原生 HTTP；带 Cloudflare 挑战的源改走 WebView 路径。
+// fetch 封装。普通源走原生 HTTP；带 Cloudflare 挑战的源优先「令牌静默复用」、回退 WebView。
 //
-// 路由规则：source.challenge?.kind === 'cloudflare' → WebView（loadURL + CF 等待 + getHTML）。
-// 这种源的所有 request.action（fetch/loadUrl）统一走 WebView，因为 CF 在 HTTP 层无解。
-// 普通源继续走 fetch；后续 Phase 会接入 v1.1.2 spec §3.3 双向 CookieJar。
+// 路由规则：source.challenge?.kind === 'cloudflare' → 先 tryNativeWithClearance（原生 fetch 带存好的
+// cf_clearance，命中真内容即返回、免 webview 免弹窗）；未命中再走 WebView 过盾（loadURL + CF 等待 +
+// getHTML），过盾成功回写新令牌（见 cfClearance.ts，真机实测 CF 不查 TLS 指纹，cookie+UA 即够）。
+// 普通源继续走 fetch。
 
 import type { Source } from '../types/source'
+import { tryNativeWithClearance } from './cfClearance'
 import { log } from './logger'
 import { type WebViewFetchOptions, webViewFetchHTML } from './webViewFetcher'
 
@@ -22,6 +24,10 @@ const DEFAULT_TIMEOUT_S = 15
 
 export async function fetchText(source: Source, url: string, options?: FetchOptions): Promise<{ status: number; body: string; finalUrl: string }> {
   if ((source.challenge as { kind?: string } | undefined)?.kind === 'cloudflare') {
+    // 先试令牌静默复用（原生 fetch 带存好的 cf_clearance）；命中即免 webview、免弹窗。
+    const reused = await tryNativeWithClearance(source, url)
+    if (reused) return reused
+    // 未命中（无令牌 / 失效 / 被挑战）回退 webview 过盾，过盾成功会回写新令牌。
     return webViewFetchHTML(source, url, { waitFor: options?.waitFor })
   }
   const headers: Record<string, string> = { ...(source.headers ?? {}) }

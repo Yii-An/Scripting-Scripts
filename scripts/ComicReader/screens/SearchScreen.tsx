@@ -40,10 +40,11 @@ const SOURCE_LIST_DESTINATION = <SourceListScreen />
 
 const ALL_KEY = 'all'
 
-export function SearchScreen() {
+export function SearchScreen({ defaultSourceId }: { defaultSourceId?: string }) {
   const enabledSources = useEnabledSources()
   const [query, setQuery] = useState<string>('')
-  const [selectedKey, setSelectedKey] = useState<string>(ALL_KEY)
+  // 默认搜索源：从浏览页带入「当前书源」时预选它（已禁用/失效则下方 useEffect 纠偏回「全部」）；无入参 = 全部。
+  const [selectedKey, setSelectedKey] = useState<string>(defaultSourceId ?? ALL_KEY)
   const [results, setResults] = useState<Book[]>([])
   const [perSource, setPerSource] = useState<PerSourceSearch[]>([])
   const [loading, setLoading] = useState<boolean>(false)
@@ -148,6 +149,20 @@ export function SearchScreen() {
       [singleSource.id]: { ...(prev[singleSource.id] ?? {}), [filterId]: value }
     }))
   }
+
+  // 切换筛选自动重搜：同一单源内改 filter（题材/进度）→ 用当前关键词立即重跑，对齐浏览页「filter 变即加载」。
+  // 仅"同源改 filter"触发——切源沿用原交互（手动点搜索）、没关键词不搜（不弹「请输入关键词」）。
+  // effectiveSearchFilters 在切源时也会变，用 prevSelectedKeyRef 把"切源引起的变化"挡在外面。
+  const prevSelectedKeyRef = useRef(selectedKey)
+  useEffect(() => {
+    const sourceSwitched = prevSelectedKeyRef.current !== selectedKey
+    prevSelectedKeyRef.current = selectedKey
+    if (sourceSwitched) return
+    if (!singleSource) return
+    if (!query.trim()) return
+    runSearch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveSearchFilters])
 
   async function openLogs() {
     await Navigation.present({

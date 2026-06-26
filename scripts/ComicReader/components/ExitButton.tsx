@@ -1,6 +1,5 @@
 // 关闭脚本按钮：挂在三个 tab 页（书架 / 浏览 / 设置）的 toolbar topBarLeading，仅这三页展示
-// （与书架刷新 / 搜索按钮同列）。退出前 flushAndExit 先把待写的 iCloud 改动刷盘再 Script.exit，
-// 避免丢数据——与设置页「退出脚本」行同一收口函数。
+// （与书架刷新 / 搜索按钮同列）。退出前 flushAndExit 先把待写的 iCloud 改动刷盘再 Script.exit，避免丢数据。
 import { Button, useState } from 'scripting'
 
 import { flushAndExit } from '../storage/bookshelfSync'

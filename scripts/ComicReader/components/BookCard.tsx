@@ -1,7 +1,8 @@
-import { HStack, Image, ProgressView, Spacer, Text, VStack, ZStack, useMemo } from 'scripting'
+import { HStack, ProgressView, Spacer, Text, VStack, ZStack } from 'scripting'
 
 import { findSourceById } from '../sources'
 import type { Book } from '../types/source'
+import { CoverImage } from './CoverImage'
 
 type BookCardProps = {
   book: Book
@@ -15,30 +16,14 @@ type BookCardProps = {
 
 const COVER_W = 84
 const COVER_H = 112
-const PLACEHOLDER_COLOR: `#${string}` = '#E5E5EA'
 const MUTED: `#${string}` = '#8E8E93'
 const WARN: `#${string}` = '#FF3B30'
 
 export function BookCard({ book, hideSourceMeta, badgeText, badgeSpinner }: BookCardProps) {
-  // useMemo 锁住封面元素引用：父层任何重渲（书架通知 / 搜索状态变化）都会重跑 BookCard，
-  // 不锁的话 Image 每次都是新 VirtualNode，原生视图重建并重走网络图加载——肉眼可见的闪烁。
-  // URL 不变就复用同一元素，reconciler 直接跳过该子树。
-  const cover = useMemo(
-    () =>
-      book.cover ? (
-        <Image
-          imageUrl={book.cover}
-          placeholder={<Image systemName="photo" frame={{ width: COVER_W, height: COVER_H }} foregroundStyle={PLACEHOLDER_COLOR} />}
-          frame={{ width: COVER_W, height: COVER_H }}
-          resizable
-          scaleToFit
-          clipShape={{ type: 'rect', cornerRadius: 6 }}
-        />
-      ) : (
-        <Image systemName="photo" frame={{ width: COVER_W, height: COVER_H }} foregroundStyle={PLACEHOLDER_COLOR} />
-      ),
-    [book.cover]
-  )
+  // 封面走 CoverImage（imageLoader 管线，带 per-source UA + Referer + cf_clearance）：CF 保护站点的封面
+  // 也能取到（系统 <Image imageUrl> 会裂图）。内部用 UIImage state 锁定已加载位图，父层重渲不重走网络、不闪烁。
+  const cover = <CoverImage url={book.cover} sourceId={book.sourceId} width={COVER_W} height={COVER_H} cornerRadius={6} />
+
   const showSpinner = badgeSpinner === true
   const showBadge = !showSpinner && typeof badgeText === 'string' && badgeText.length > 0
   return (
@@ -78,7 +63,7 @@ export function BookCard({ book, hideSourceMeta, badgeText, badgeSpinner }: Book
         <Spacer />
         {hideSourceMeta ? null : (
           <Text font="caption2" foregroundStyle={MUTED}>
-            {findSourceById(book.sourceId)?.name ?? book.sourceId} · {book.id}
+            {findSourceById(book.sourceId)?.name ?? book.sourceId}
           </Text>
         )}
       </VStack>

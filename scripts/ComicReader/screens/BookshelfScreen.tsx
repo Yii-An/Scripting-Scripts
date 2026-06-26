@@ -1,5 +1,6 @@
 import { Button, HStack, Image, NavigationLink, ProgressView, Spacer, Text, VStack, ZStack, useEffect, useMemo, useRef, useState } from 'scripting'
 
+import { CoverImage } from '../components/CoverImage'
 import { ExitButton } from '../components/ExitButton'
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { type CheckStatus, checkBatch } from '../services/updateChecker'
@@ -15,7 +16,6 @@ import { SearchScreen } from './SearchScreen'
 const MUTED: `#${string}` = '#8E8E93'
 const ACCENT: `#${string}` = '#5856D6'
 const WARN: `#${string}` = '#FF3B30'
-const PLACEHOLDER: `#${string}` = '#E5E5EA'
 const HINT_BG: `#${string}` = '#EEF1F7'
 // 封面尺寸 —— 跟 BookCard 保持一致，避免书架 / 浏览页两套不一致的视觉量级。
 const COVER_W = 84
@@ -157,24 +157,10 @@ function WorkRow({ work, status, onOpenDetail }: { work: Work; status: CheckStat
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const continueDestination = useMemo(() => <ContinueReadingScreen workId={work.id} />, [work.id])
 
-  // useMemo 锁封面元素引用：WorkRow 在书架任何 UI 级变化（进度 / badge / 增删）时重渲，
-  // 不锁的话 Image 节点重建 → 重走网络图加载 → 封面闪烁。URL 不变就复用同一元素。
-  const coverImg = useMemo(
-    () =>
-      book.cover ? (
-        <Image
-          imageUrl={book.cover}
-          placeholder={<Image systemName="photo" frame={{ width: COVER_W, height: COVER_H }} foregroundStyle={PLACEHOLDER} />}
-          frame={{ width: COVER_W, height: COVER_H }}
-          resizable
-          scaleToFit
-          clipShape={{ type: 'rect', cornerRadius: 6 }}
-        />
-      ) : (
-        <Image systemName="photo" frame={{ width: COVER_W, height: COVER_H }} foregroundStyle={PLACEHOLDER} />
-      ),
-    [book.cover]
-  )
+  // 封面走 CoverImage（imageLoader 管线，带 per-source UA + Referer + cf_clearance）：CF 保护站点的封面也能取到。
+  // 内部用 UIImage state 锁定已加载位图，WorkRow 在书架任何 UI 级变化（进度 / badge / 增删）重渲都不重走网络、不闪烁。
+  const coverImg = <CoverImage url={book.cover} sourceId={book.sourceId} width={COVER_W} height={COVER_H} cornerRadius={6} />
+
   const cover =
     showSpinner || showBadge ? (
       <ZStack alignment="topTrailing">

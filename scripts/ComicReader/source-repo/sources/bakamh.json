@@ -1,0 +1,304 @@
+{
+  "id": "bakamh",
+  "name": "巴卡漫画",
+  "type": "comic",
+  "version": 1,
+  "schemaVersion": 1,
+  "_recon": "Playwright 真机浏览器逐页验证（CF 挑战下 fetch/CLI 均拿不到 HTML，靠真浏览器过盾后取真实 DOM）。站点 = Madara WordPress 主题（wp-theme-madara），深度汉化定制。",
+  "_challengeNotes": "本 App 环境（iPad 伪装 iPhone UA 的 WKWebView）下 bakamh 被 CF 抽到【主动重型挑战】（「请稍候」chl_page+flow）——CF 按访客自适应抽档、非站点固定：Playwright 干净桌面 IP 反走被动 jsd 直接 200、被卡的是 jmcomic，与设备相反（详见记忆 comic-source-cf-managed-challenge）。真机定论：过盾失败真凶=任何东西节流重型挑战 JS（getHTML 跨桥搬整页 / present 前离屏等待 / 轮询 t≈0 抢主线程 / 每轮序列化 outerHTML / 状态机误判），都会让挑战 JS 90s 跑不完 → 反复重发验证页死循环。架构（webViewFetcher + cfClearance + imageLoader 三处协同）：① 过盾走 visibleChallenge 专用 webViewFetcher.waitForVisibleChallenge，严格镜像裸探针 runVisibleProbe——present【立刻】可见 + 轮询【先 sleep 1.5s 再页内匹配 successMarker 回传布尔、绝不 getHTML 跨桥、不跑挑战态状态机】（详见记忆 cf-visible-challenge-present-immediately）。② dispatchNavigation 对 visibleChallenge 源【每次过 webview 都清掉所有 CF cookie（含 cf_clearance）】再真顶层 loadURL——它的 stale clearance 会毒化新鲜重型挑战（与 jmcomic 相反：jmcomic 保留 clearance + synthetic 复用）；该判定在同源短路【之前】且无条件，否则令牌过期回退会落进同源点击离屏路径被节流。③ 令牌静默复用：过盾成功 persistClearance 抽全 cookie 存 cfClearance；httpClient 后续请求【先原生 fetch 带 cf_clearance】静默命中（无 webview 无弹窗），失效才回退 webview 重过（详见记忆 cf-clearance-native-reuse）。真机实测 ~5.5s 过盾、令牌静默跑 42–103 分钟、过期才弹一次。successMarkers=wp-theme-madara（真实页 body class 有、挑战页没有）。Turnstile 交互复选框则用户点一下，非交互挑战不被节流时自动过。",
+  "_madaraQuirks": "定制点：① 章节 li 类名被改成 chapter-loveYou（标准 .wp-manga-chapter 失效），列表锚 ul.version-chap；② 详情标题不在 .post-title h1，取 og:title；③ 状态/标籤在 .post-content_item 行里，状态靠 @js 按行头精确取；④ 阅读页真图在 img.wp-manga-chapter-img 的 data-manga-src/src，URL 带前导空格，正则 (https?://\\S+) 剥掉。站点 JS 仅 img.src=data-manga-src，无变换——data-manga-src 即真 URL。",
+  "_verify": "Playwright 真浏览器实测（2026-06）：search/listing/detail/chapter/page 的实际 Expr 选择器全部命中正确值——搜索 12 命中、详情 title/cover/desc/author/tags/status 全对、章节 116 章 id=c-NN/number/url 全对、阅读页 223 张图 0 前导空格全合法 URL。",
+  "_imageNotes": "读图已解决（曾因 CF 盾 403 裂图）：封面 + 正文都走 imageLoader 管线，imageHeadersWithClearance 注入该 origin 已存的 cf_clearance（过盾时 persistClearance 落盘、过期随下次过盾刷新）——CF 保护的 bakamh.com 图床（封面 wp-content/uploads、新章节 wp-content/uploads/WP-manga/data）带令牌原生取图即 200。封面经 components/CoverImage、正文经 components/RemoteImage，同一条管线；绝不用系统 <Image imageUrl>（无浏览器 UA/Referer/令牌会裂，详见记忆 comicreader-images-via-pipeline-only）。真机已确认封面正常显示。图床因书而异：当前/新章节在 bakamh.com，旧章节走 t1-t5.bakamh.de（部分已 404 清档）；allowedImageHosts 已含 bakamh.com + t1-t5.bakamh.de。",
+  "host": "https://bakamh.com",
+  "charset": "utf-8",
+  "iconUrl": "https://bakamh.com/wp-content/uploads/2017/10/3.png",
+  "languages": ["zh"],
+  "contentRating": "nsfw",
+
+  "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+  },
+  "cookieJar": true,
+  "rateLimit": { "qps": 3, "maxConcurrent": 2 },
+
+  "comic": {
+    "readingMode": "webtoon",
+    "maxImageConcurrency": 4
+  },
+
+  "challenge": {
+    "kind": "cloudflare",
+    "webview": {
+      "successMarkers": ["wp-theme-madara"],
+      "maxWaitMs": 90000,
+      "visibleChallenge": true
+    }
+  },
+
+  "_searchNote": "搜索 = Madara 高级搜索（?s=&post_type=wp-manga + 可选筛选），Playwright 带【真关键词】实测：① genre[]（题材）保留关键词且按题材过滤（s=秘密&genre[]=韩漫 → 全是含『秘密』的韩漫），7 选都有货，保留；② status[]（进度）同样保留关键词（s=秘密&status[]=end → 全是含『秘密』的完结），连载中/完结/停刊有货（12/12/8），休刊仅 1、即将推出 0 已剔除；③ ⚠ m_orderby（排序）【弃用】：它会【吞掉关键词】——s=秘密&m_orderby=views 返回全站热门（秘密教学外都不含『秘密』），只有空关键词测试才像『能用』；搜索框恒带关键词，故不提供排序，勿回填；④ adult 坏的（adult=1 返 0、adult=0 同全部）已排除。filter 值放完整查询片段（如 '&genre[]=bl&op=1'），『全部』=空串让该段消失，靠 interpolate raw 替换（同 listings scope，非 encode）。op=1 只对题材有意义，status 不需要。题材 slug 取自站点高级搜索表单 checkbox 的 value（已百分号编码）。",
+  "search": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/?s={{keyword|encode}}&post_type=wp-manga{{filters.genre}}{{filters.status}}"
+    },
+    "filters": [
+      {
+        "id": "genre",
+        "name": "题材",
+        "default": "",
+        "options": [
+          { "value": "", "name": "全部" },
+          { "value": "&genre[]=bl&op=1", "name": "BL" },
+          { "value": "&genre[]=%e5%85%a8%e5%b9%b4%e9%be%84&op=1", "name": "全年龄" },
+          { "value": "&genre[]=%e5%8a%a8%e7%94%bb&op=1", "name": "动画" },
+          { "value": "&genre[]=%e6%b1%89%e5%8c%96%e5%90%8c%e4%ba%ba%e5%bf%97&op=1", "name": "汉化同人志" },
+          { "value": "&genre[]=%e6%b1%89%e5%8c%96%e6%97%a5%e6%bc%ab&op=1", "name": "汉化日漫" },
+          { "value": "&genre[]=en-manga&op=1", "name": "英文漫画" },
+          { "value": "&genre[]=%e9%9f%a9%e6%bc%ab&op=1", "name": "韩漫" }
+        ]
+      },
+      {
+        "id": "status",
+        "name": "进度",
+        "default": "",
+        "options": [
+          { "value": "", "name": "全部" },
+          { "value": "&status[]=on-going", "name": "连载中" },
+          { "value": "&status[]=end", "name": "完结" },
+          { "value": "&status[]=canceled", "name": "停刊" }
+        ]
+      }
+    ],
+    "parse": {
+      "list": "div.c-tabs-item__content, div.page-item-detail",
+      "fields": {
+        "id": "a[href*='/manga/']@attr=href##.*?/manga/([^/]+)/.*##$1",
+        "title": "div.post-title h3 a@text || div.post-title h3@text || div.tab-thumb a@attr=title",
+        "cover": "img@attr=data-src || img@attr=src",
+        "url": "a[href*='/manga/']@attr=href"
+      },
+      "pagination": {
+        "kind": "page",
+        "urlTemplate": "{{host}}/page/{{page}}/?s={{keyword|encode}}&post_type=wp-manga{{filters.genre}}{{filters.status}}",
+        "maxPages": 50
+      }
+    }
+  },
+
+  "_listingsNote": "浏览分类【忠实镜像站点主菜单】（均服务端渲染 div.page-item-detail、/<seg>/page/N/ 分页，Playwright 实测内容与标签相符）：① 分类（类型，挂在『首页』下拉）= /manhwa/(韩漫) /bl/(BL漫画) /gl/(GL漫画) /anime/(动画) /allages/(全年龄漫画) /en-manga/(英文漫画)；② 连载 /on-going/ + 子档 zh/(中文) bl/(BL) en/(英文)；③ 完结 /end/ + 同样子档；④ 新作 /newmanga/。连载/完结的『全部』= 不带子档的 /on-going/、/end/。子档值带尾斜杠（如 'zh/'）靠 interpolate raw 替换（同 niaoniao scope，非 encode）。⚠ 故意不做 m_orderby 排序：分类页上是空操作（实测 latest/views/trending/alphabet/rating/new-manga 返回完全相同序列）。⚠ 弃用 /manga/：AJAX 档、原始 HTML 无条目。题材页 /manga-genre/<slug>/ 与类型分类重复，未纳入。",
+  "listings": [
+    {
+      "id": "category",
+      "name": "分类",
+      "kind": "grid",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/{{filters.cat}}/"
+      },
+      "filters": [
+        {
+          "id": "cat",
+          "name": "类型",
+          "default": "manhwa",
+          "options": [
+            { "value": "manhwa", "name": "韩漫" },
+            { "value": "bl", "name": "BL漫画" },
+            { "value": "gl", "name": "GL漫画" },
+            { "value": "anime", "name": "动画" },
+            { "value": "allages", "name": "全年龄漫画" },
+            { "value": "en-manga", "name": "英文漫画" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.page-item-detail, div.c-tabs-item__content",
+        "fields": {
+          "id": "a[href*='/manga/']@attr=href##.*?/manga/([^/]+)/.*##$1",
+          "title": "div.post-title h3 a@text || div.post-title h3@text || div.item-thumb a@attr=title",
+          "cover": "img@attr=data-src || img@attr=src",
+          "url": "a[href*='/manga/']@attr=href"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/{{filters.cat}}/page/{{page}}/",
+          "maxPages": 50
+        }
+      }
+    },
+    {
+      "id": "ongoing",
+      "name": "连载",
+      "kind": "grid",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/on-going/{{filters.scope}}"
+      },
+      "filters": [
+        {
+          "id": "scope",
+          "name": "范围",
+          "default": "",
+          "options": [
+            { "value": "", "name": "全部" },
+            { "value": "zh/", "name": "中文" },
+            { "value": "bl/", "name": "BL" },
+            { "value": "en/", "name": "英文" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.page-item-detail, div.c-tabs-item__content",
+        "fields": {
+          "id": "a[href*='/manga/']@attr=href##.*?/manga/([^/]+)/.*##$1",
+          "title": "div.post-title h3 a@text || div.post-title h3@text || div.item-thumb a@attr=title",
+          "cover": "img@attr=data-src || img@attr=src",
+          "url": "a[href*='/manga/']@attr=href"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/on-going/{{filters.scope}}page/{{page}}/",
+          "maxPages": 50
+        }
+      }
+    },
+    {
+      "id": "completed",
+      "name": "完结",
+      "kind": "grid",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/end/{{filters.scope}}"
+      },
+      "filters": [
+        {
+          "id": "scope",
+          "name": "范围",
+          "default": "",
+          "options": [
+            { "value": "", "name": "全部" },
+            { "value": "zh/", "name": "中文" },
+            { "value": "bl/", "name": "BL" },
+            { "value": "en/", "name": "英文" }
+          ]
+        }
+      ],
+      "parse": {
+        "list": "div.page-item-detail, div.c-tabs-item__content",
+        "fields": {
+          "id": "a[href*='/manga/']@attr=href##.*?/manga/([^/]+)/.*##$1",
+          "title": "div.post-title h3 a@text || div.post-title h3@text || div.item-thumb a@attr=title",
+          "cover": "img@attr=data-src || img@attr=src",
+          "url": "a[href*='/manga/']@attr=href"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/end/{{filters.scope}}page/{{page}}/",
+          "maxPages": 50
+        }
+      }
+    },
+    {
+      "id": "newmanga",
+      "name": "新作",
+      "kind": "grid",
+      "request": {
+        "action": "loadUrl",
+        "url": "{{host}}/newmanga/"
+      },
+      "parse": {
+        "list": "div.page-item-detail, div.c-tabs-item__content",
+        "fields": {
+          "id": "a[href*='/manga/']@attr=href##.*?/manga/([^/]+)/.*##$1",
+          "title": "div.post-title h3 a@text || div.post-title h3@text || div.item-thumb a@attr=title",
+          "cover": "img@attr=data-src || img@attr=src",
+          "url": "a[href*='/manga/']@attr=href"
+        },
+        "pagination": {
+          "kind": "page",
+          "urlTemplate": "{{host}}/newmanga/page/{{page}}/",
+          "maxPages": 50
+        }
+      }
+    }
+  ],
+
+  "detail": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/manga/{{book.id}}/"
+    },
+    "parse": {
+      "fields": {
+        "title": "meta[property='og:title']@attr=content || h1@text",
+        "cover": "div.summary_image img@attr=data-src || div.summary_image img@attr=src",
+        "description": "meta[property='og:description']@attr=content",
+        "author": "div.author-content a@text",
+        "tags": "a[href*='/manga-tag/']@text || div.genres-content a@text",
+        "status": "@js: var items=document.querySelectorAll('.post-content_item'); for (var i=0;i<items.length;i++){ var h=items[i].querySelector('.summary-heading'); if (h && h.textContent.indexOf('状态')>-1){ var c=items[i].querySelector('.summary-content'); var t=c?c.textContent:''; if (t.indexOf('连载')>-1||t.indexOf('連載')>-1) return 'ongoing'; if (t.indexOf('完结')>-1||t.indexOf('完結')>-1) return 'completed'; return 'unknown'; } } return 'unknown';"
+      }
+    },
+    "lazyLoad": {
+      "strategy": "waitFor",
+      "waitFor": { "kind": "expr", "expr": "@js: return document.querySelectorAll('ul.version-chap li a').length > 0" },
+      "maxWaitMs": 12000,
+      "pollIntervalMs": 250
+    }
+  },
+
+  "chapter": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/manga/{{book.id}}/"
+    },
+    "parse": {
+      "list": "ul.version-chap li a",
+      "fields": {
+        "id": "@attr=href##.*?/manga/[^/]+/([^/?#]+).*##$1",
+        "title": "@text",
+        "url": "@attr=href",
+        "number": "@text##.*?(\\d+(?:\\.\\d+)?).*##$1"
+      }
+    },
+    "lazyLoad": {
+      "strategy": "waitFor",
+      "waitFor": { "kind": "expr", "expr": "@js: return document.querySelectorAll('ul.version-chap li a').length > 0" },
+      "maxWaitMs": 12000,
+      "pollIntervalMs": 250
+    }
+  },
+
+  "page": {
+    "request": {
+      "action": "loadUrl",
+      "url": "{{host}}/manga/{{book.id}}/{{chapter.id}}/"
+    },
+    "parse": {
+      "pages": "div.page-break img.wp-manga-chapter-img@attr=data-manga-src##.*?(https?://\\S+).*##$1 || div.page-break img.wp-manga-chapter-img@attr=src##.*?(https?://\\S+).*##$1"
+    },
+    "lazyLoad": {
+      "strategy": "waitFor",
+      "waitFor": { "kind": "expr", "expr": "@js: return document.querySelectorAll('div.page-break img.wp-manga-chapter-img').length > 0" },
+      "maxWaitMs": 15000,
+      "pollIntervalMs": 300
+    }
+  },
+
+  "imagePipeline": {
+    "headers": {
+      "Referer": "https://bakamh.com/"
+    },
+    "refererStrategy": "fixed",
+    "allowedImageHosts": [
+      "t1.bakamh.de",
+      "t2.bakamh.de",
+      "t3.bakamh.de",
+      "t4.bakamh.de",
+      "t5.bakamh.de",
+      "bakamh.de",
+      "bakamh.com"
+    ],
+    "retry": { "count": 2, "backoffMs": 500 }
+  }
+}

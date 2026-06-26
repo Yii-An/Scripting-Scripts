@@ -1,16 +1,16 @@
 // WebView 取页：用于带 Cloudflare 挑战的书源。
 //
-// 流程严格 6 步（对齐 Reader webViewExtractor.ts:603-614 的约定）：
+// 两条流程，按 dispatchNavigation 返回的呈现模式分叉：
 //   1) new WebViewController()  ——  持久默认 data store，cf_clearance 跨实例/重启留存
-//   2) dispatchNavigation  ——  统一走同源 <a>.click()（首次先 loadHTML 钉 origin），
-//                              navType=linkActivated 才会把 store 里的 cf_clearance 附加到导航
-//   3) waitForDocumentSwap  ——  等点击前盖在旧文档上的 nav token 消失（文档已替换）。
-//                              不等的话 waitForLoad 在「点击派发→provisional 导航启动」的
-//                              窗口期会拿旧文档的 complete 立即返回，后续全在旧页上做
-//   4) waitForLoad             ——  等新文档 didFinish，document.body 才一定就绪
-//   5) waitForCloudflareChallenge  ——  轮询 DOM 标志位，挑战通过/失败
-//   6) waitForLoad（兜底二次导航）→ getHTML  ——  CF 通过瞬间会换 document，
-//                                              再等一次确保 getHTML 在稳定 DOM 上
+//   2) dispatchNavigation  ——  visibleChallenge 源(bakamh)每次过 webview 都清掉 CF cookie(含 stale cf_clearance)+
+//                              真顶层 loadURL，返回 'eagerVisible'；其它源(jmcomic)保留 cf_clearance、synthetic 复用，返回 'offscreen'
+//   ── eagerVisible 分支（visibleChallenge 源）：loadURL 后【立刻】waitForVisibleChallenge——整套照搬裸探针
+//      runVisibleProbe：present 立刻可见 → 轮询【先 sleep 再轻量查 successMarkers】→ 命中即 dismiss 放行，不跑挑战态
+//      状态机。present 之前【绝不】插 waitForDocumentSwap/waitForLoad，轮询【绝不】在 t≈0 抢主线程——清掉 clearance
+//      后是新鲜重型 CF 挑战，任何离屏窗口/早抢主线程都会节流挑战 JS、使其内部超时 → CF 反复重发验证页（=「重复过盾」）。
+//   ── offscreen 分支（其它源）：3) waitForDocumentSwap（等旧文档 nav token 消失，否则 waitForLoad 会拿旧文档的 complete
+//      立即返回）→ 4) waitForLoad（新文档 didFinish、body 就绪）→ 5) waitForCloudflareChallenge（离屏轮询，挑战态状态机）。
+//   6) 兜底二次 waitForLoad → getHTML  ——  CF 通过瞬间会换 document，再等一次确保 getHTML 在稳定 DOM 上
 //
 // CF 致命错（Turnstile / 脚本 __error / result 非预期）用 CloudflareFatalError 抛，
 // catch 块开头先重抛绕过 consecutiveErrors 重试计数，保证 Debug-First。
@@ -18,6 +18,7 @@
 import { getEnabledSources } from '../sources'
 import { subscribeSettings } from '../storage/settings'
 import { type Source, primaryHost } from '../types/source'
+import { saveClearance } from './cfClearance'
 import { log } from './logger'
 
 interface ControllerEntry {
@@ -148,22 +149,81 @@ function isSameOrigin(a: string, b: string): boolean {
 // 钉到目标站点，让随后的 <a>.click() 成为「同源 linkActivated 导航」。
 const ORIGIN_PRIME_HTML = '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'
 
-// 所有导航统一走「同源 <a>.click()」路径（navType=linkActivated）。
-// 关键事实（实测）：裸 loadURL 是 navType="other"，即便持久 store 里已有 cf_clearance，
-// outgoing 请求也 cookieLength:0——store 的 cookie 不附加到 "other" 导航。
-// 而 linkActivated 会附加。所以新建 / 跨源的首次导航不能裸 loadURL：
-// 先 loadHTML 把 origin 钉好（不发网络），再点击导航，让 cf_clearance 跟上去秒过 CF。
-async function dispatchNavigation(entry: ControllerEntry, source: Source, url: string): Promise<boolean> {
+// cf_clearance 按源分两策（真机 + 裸探针对照实测定，详见记忆 comic-source-cf-managed-challenge）：
+//   • 非 visibleChallenge 源（jmcomic，轻量档）：clearance 有效可复用。冷启动【保留】cf_clearance，走
+//     synthetic prime+click——loadHTML 空壳钉 origin（零网络）+ 同源 <a>.click() 发 linkActivated 导航，
+//     让 store 的 clearance 附加上去（裸 loadURL=navType"other" 不附加），跨重启秒过（~232ms）。
+//   • visibleChallenge 源（bakamh，主动重型挑战）：它的 cf_clearance 不可靠——一旦 stale 会【毒化】挑战。
+//     铁证对照：ComicReader 留着 stale clearance + loadURL → 90s 超时；裸探针把 cf_clearance + cf_chl_rc_ni
+//     都删掉 + loadURL + 可见 → 5.5s 过。且 synthetic 在其挑战下会被判 bot 死循环。而且能走到 webview 必然是
+//     原生令牌已失效（httpClient 先试令牌、失败才回退），手里 clearance 必 stale——所以【每次过 webview】（不限
+//     冷启动）都【清掉所有 CF cookie（含 cf_clearance）】→ 真顶层 loadURL → eagerPresent 可见，重过一次可见挑战（~5.5s）。
+//     这条判定必须在同源短路【之前】：否则令牌过期回退时同源 detail 会落进 offscreen 点击路径，带 stale clearance
+//     反复 90s 超时（真机日志实证的「重复过盾」死循环）。
+// 两策都清挑战态 cf_chl_*（残留 cf_chl_rc_ni 是限速 cookie，留着会让 CF 误判挑战在途而限速）。
+// 教训：别对 visibleChallenge 源「复用 clearance」——它的 clearance 是毒、synthetic 会死循环，反而触发限速死循环。
+type DispatchMode = 'eagerVisible' | 'offscreen'
+
+// synthetic prime+click：loadHTML 空壳钉 origin（零网络）→ 同源 <a>.click() 发 linkActivated 导航，
+// 让持久 store 的 cf_clearance 附加上去。clearance 有效则秒过、无挑战；失效则落到真挑战页，由轮询升级处理。
+async function syntheticPrimeClick(entry: ControllerEntry, source: Source, url: string, origin: string): Promise<void> {
+  const primed = await entry.controller.loadHTML(ORIGIN_PRIME_HTML, origin)
+  if (!primed) throw new Error(`loadHTML 预置 origin 失败: ${origin}`)
+  entry.currentUrl = origin
+  const ok = await clickNavigate(entry, source, url)
+  if (!ok) throw new Error(`synthetic 点击导航失败: ${url}`)
+}
+
+// 派发导航并返回 CF 轮询该用的呈现模式：
+//   'eagerVisible' = 一上来就 present 可见（visibleChallenge 源冷启动，主动重型挑战需前台全速跑）；
+//   'offscreen'    = 离屏轮询（同源 / synthetic 复用 / 轻量档）。
+async function dispatchNavigation(entry: ControllerEntry, source: Source, url: string): Promise<DispatchMode> {
   const currentUrl = entry.currentUrl
-  if (!currentUrl || !isSameOrigin(currentUrl, url)) {
-    const origin = originOf(url)
-    log.info('webview', 'origin 预置（loadHTML 空壳，零网络）', { source: source.id, origin, from: currentUrl })
-    const primed = await entry.controller.loadHTML(ORIGIN_PRIME_HTML, origin)
-    if (!primed) throw new Error(`loadHTML 预置 origin 失败: ${origin}`)
-    // loadHTML 的 Promise resolve 即文档就绪；不再单独 waitForLoad，避免误吞随后点击导航的 didFinish。
-    entry.currentUrl = origin
+  const origin = originOf(url)
+  const visibleChallenge = (source.challenge as { webview?: { visibleChallenge?: boolean } } | undefined)?.webview?.visibleChallenge === true
+
+  // visibleChallenge 源（bakamh）：能走到 webview 必然是原生令牌已失效（httpClient 先试令牌、失败才回退这里），
+  // 即【没有】可复用的有效 cf_clearance。所以无论冷启动还是同源后续，都【不能】走同源点击复用（会带 stale
+  // cf_clearance 毒化挑战）、也不能离屏轮询（节流新鲜重型挑战 JS）——必须每次清掉所有 CF cookie + 真顶层
+  // loadURL + eager 立刻可见，重新过一次可见挑战（~5.5s，对齐裸探针）。
+  // 这条必须在同源短路【之前】判：令牌过期回退 webview 时，本实例 currentUrl 可能还停在很久前的同源列表页、
+  // store 里 cf_clearance 已 stale，若先命中同源短路就会带 stale clearance 点击导航 + 离屏轮询 → 反复 90s
+  // 超时（=「重复过盾」死循环，真机日志实证）。
+  if (visibleChallenge) {
+    const cookies = await entry.controller.getCookies(`${origin}/`).catch(() => [])
+    const toClear = cookies.filter(c => c.name.indexOf('cf_chl') === 0 || c.name === 'cf_clearance')
+    for (const c of toClear) await entry.controller.deleteCookie(c).catch(() => false)
+    log.info('webview', 'visibleChallenge：清掉所有 CF cookie + 真顶层 loadURL + eager 可见（对齐裸探针 ~5.5s）', {
+      source: source.id,
+      url,
+      from: currentUrl,
+      clearedNames: toClear.map(c => c.name).join(',') || '无'
+    })
+    const loaded = await entry.controller.loadURL(url)
+    if (!loaded) throw new Error(`loadURL 失败: ${url}`)
+    return 'eagerVisible'
   }
-  return clickNavigate(entry, source, url)
+
+  // ↓ 以下仅非 visibleChallenge 源（jmcomic，轻量档，cf_clearance 有效可复用）。
+  // 同源后续导航：直接 linkActivated 点击，复用本实例已附上的 cf_clearance（秒过）。
+  if (currentUrl && isSameOrigin(currentUrl, url)) {
+    const ok = await clickNavigate(entry, source, url)
+    if (!ok) throw new Error(`同源点击导航失败: ${url}`)
+    return 'offscreen'
+  }
+  // 冷启动/跨源：只清挑战态 cf_chl_*（残留 cf_chl_rc_ni 是限速 cookie，留着会让 CF 误判挑战在途而限速），
+  // 保留 cf_clearance 以便 synthetic prime+click 经 linkActivated 把 store 的 clearance 带上去复用（跨重启 ~232ms）。
+  const cookies = await entry.controller.getCookies(`${origin}/`).catch(() => [])
+  const toClear = cookies.filter(c => c.name.indexOf('cf_chl') === 0)
+  for (const c of toClear) await entry.controller.deleteCookie(c).catch(() => false)
+  log.info('webview', '冷启动：synthetic prime+click（保留 cf_clearance 复用，离屏轮询）', {
+    source: source.id,
+    url,
+    from: currentUrl,
+    clearedNames: toClear.map(c => c.name).join(',') || '无'
+  })
+  await syntheticPrimeClick(entry, source, url, origin)
+  return 'offscreen'
 }
 
 // 导航 token：点击前盖在旧文档 window 上。新文档的 window 是全新对象，token 必然消失——
@@ -217,16 +277,26 @@ function withSourceLock<T>(sourceId: string, fn: () => Promise<T>): Promise<T> {
 const DEFAULT_LOAD_TIMEOUT_MS = 25_000
 const DEFAULT_CF_WAIT_MS = 25_000
 const CF_POLL_INTERVAL_MS = 500
+// waitForVisibleChallenge（visibleChallenge 源）的轮询间隔：对齐裸探针的 1.5s，尽量少抢主线程，让重型挑战 JS 全速跑。
+const CF_VISIBLE_POLL_INTERVAL_MS = 1_500
 // 首轮 HTML success 后的复检间隔。二次确认只防 navigation 瞬间 DOM 半替换的竞态，
 // 不需要等满一个挑战轮询周期——CF 静默通过的快速路径每页能省下 ~400ms。
 const CF_SUCCESS_CONFIRM_MS = 100
 const CF_CHECK_TIMEOUT_MS = 3_000
-// CF Bot Fight Mode 在不可见 WebView 上常硬阻断；超过该阈值仍 isChallenge 时弹出 present 让用户人工过。
+// CF 主动挑战在不可见 WebView 上常硬阻断；超过该阈值仍 isChallenge 时弹出 present 让用户人工过。
 const CF_INTERACTIVE_FALLBACK_MS = 5_000
-// HTML probe 每轮都跑（getHTML + 几个正则总开销 < 10ms 可忽略）。
-// 若 HTML 既不 success 也不 stuck，连续维持 unknown 超过该阈值且 DOM 无强挑战信号 + 文档就绪 → fallback 放行。
-// 适用：站点真实页面 marker 与我们配的不匹配（site selectors 写错时不会卡死 30s）。
+// 检测脚本在页内算 success/stuck（不再 getHTML 跨桥）。若既不 success 也不 stuck，连续维持 unknown
+// 超过该阈值且 DOM 无强挑战信号 + 文档就绪 → fallback 放行（站点 marker 配错时不会卡死 30s）。
 const HTML_FALLBACK_UNKNOWN_MS = 4_000
+// stuck = challenge-platform + 「验证成功」字串 + ≥10s meta-refresh 三件套全中（见 buildCfCheckScript）。
+// 实测 bakamh：这其实是 CF「请稍候」**非交互挑战进行中**页（藏隐藏「验证成功」+ 360s 兜底 refresh
+// 凑齐三件套），cf_clearance 始终为空、挑战没过。给几秒看能否静默自过；过不了就呈现**可见** WebView，
+// 让挑战 JS 前台全速跑 + 用户手动完成——这是主动重型挑战在 WKWebView 里唯一可行的过法。
+const STUCK_PRESENT_DELAY_MS = 3_000
+// present() 真正呈现前调 dismiss() 会被忽略（文档：「if the WebView is not presented, do nothing」）。
+// 清 cookie + loadURL 后挑战常在 waitForLoad 期间就过、首拍即 success，dismiss 撞在 present 动画途中 → 窗口
+// 永久留着。故 dismiss 前保证自最近一次 present 起至少可见这么久，让呈现落定、dismiss 必定生效。
+const CF_MIN_VISIBLE_MS = 800
 
 // 真实页面正向 marker 来自 source.json（challenge.webview.successMarkers：正则字符串数组，
 // 全部命中即 success）。站点特征不进业务代码（architecture-principles 红线）——
@@ -248,18 +318,19 @@ function successMarkersFor(source: Source): RegExp[] {
   return markers
 }
 
-// CF interstitial 的「验证成功卡在等待」三件套——三个全中才算 stuck，避免 challenge-platform 心跳脚本误判。
-// 注意：必须严格匹配 `/cdn-cgi/challenge-platform/`（带尾斜杠），不能裸 `cdn-cgi`——否则 email-decode/rum 会误中。
-const HTML_STRICT_CHALLENGE = /\/cdn-cgi\/challenge-platform\//
-const HTML_STUCK_BODY = /验证成功|verification successful/i
-const HTML_STUCK_META = /<meta[^>]+http-equiv="refresh"[^>]+content="\d{2,}/i
-
 // 关键：原 Reader 版本用 `script[src*="cdn-cgi"]` 这样的宽松选择器，会被 CF 保护站点的
 // 普通资源（email-decode.min.js、/cdn-cgi/rum 等）误命中——一旦挑战页消失、真实站点加载
 // 这些路径，isChallenge 永远 true。修正：cdn-cgi 必须严格匹配 challenge-platform 子路径。
-const CF_CHECK_SCRIPT = `return (function(){
+// 按 source 注入 successMarkers 后生成的 CF 轮询检测脚本。关键：success/stuck 全在【页内】对
+// document outerHTML 求正则、只回传布尔小对象——绝不把整页 HTML 跨桥搬出（大返回值 evaluateJavaScript
+// 抢主线程、把 CF 挑战 JS 节流到跑不完，是真机定位过的真凶）。outerHTML 页内取 + 正则 ~ms 级可忽略。
+function buildCfCheckScript(markers: RegExp[]): string {
+  const markerSources = JSON.stringify(markers.map(m => m.source))
+  return `return (function(){
   try {
     var title = document.title || ''
+    var html = ''
+    try { html = document.documentElement ? document.documentElement.outerHTML : '' } catch (e) { html = '' }
     var bodyText = ''
     try { bodyText = document.body && document.body.textContent ? document.body.textContent : '' }
     catch (e) { bodyText = '' }
@@ -297,9 +368,25 @@ const CF_CHECK_SCRIPT = `return (function(){
     var onChallengePath = Boolean(location && typeof location.pathname === 'string' && /^\\/cdn-cgi\\/(challenge|chl_)/i.test(location.pathname))
     var isChallenge = Boolean(hasChallengeForm || hasChallengePlatform || hasTurnstile || onChallengePath || (titleMatch && bodyMatch))
     var isInteractive = Boolean(hasTurnstile)
+    // success：source.json 的 successMarkers 全部命中 outerHTML（真实页面正向特征；无 marker 则恒 false）。
+    var success = false
+    try {
+      var pats = ${markerSources}
+      success = html.length >= 512 && pats.length > 0
+      for (var i = 0; i < pats.length; i++) { if (!new RegExp(pats[i]).test(html)) { success = false; break } }
+    } catch (e) { success = false }
+    // stuck：challenge-platform + 「验证成功」+ ≥10s meta-refresh 三件套全中 = CF「请稍候」非交互挑战进行页（非真过盾）。
+    var stuck = false
+    try {
+      stuck = /\\/cdn-cgi\\/challenge-platform\\//.test(html)
+        && /验证成功|verification successful/i.test(html)
+        && /<meta[^>]+http-equiv="refresh"[^>]+content="\\d{2,}/i.test(html)
+    } catch (e) { stuck = false }
     return {
       isChallenge: isChallenge,
       isInteractive: isInteractive,
+      success: success,
+      stuck: stuck,
       verifiedButStuck: verifiedButStuck,
       readyState: String(document.readyState || ''),
       href: String(location && location.href || ''),
@@ -319,10 +406,13 @@ const CF_CHECK_SCRIPT = `return (function(){
     }
   } catch (e) { return { __error: String(e && e.message ? e.message : e) } }
 })()`
+}
 
 interface CfCheckResult {
   isChallenge?: boolean
   isInteractive?: boolean
+  success?: boolean
+  stuck?: boolean
   verifiedButStuck?: boolean
   readyState?: string
   href?: string
@@ -443,6 +533,18 @@ async function waitForExpression(
   log.warn('webview', `lazyLoad 超时 DOM 诊断`, { source: source.id, url, probe })
 }
 
+// 过盾成功后落令牌：抽该 origin 全部 cookie 拼 Cookie 头 + 当次 UA 存进 cfClearance（best-effort，失败不影响结果）。
+async function persistClearance(source: Source, url: string, controller: WebViewController): Promise<void> {
+  try {
+    const origin = originOf(url)
+    const cookies = await controller.getCookies(`${origin}/`)
+    const header = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+    saveClearance(source, url, header, source.userAgent ?? '')
+  } catch (e) {
+    log.warn('webview', '存 CF 令牌失败（不影响本次结果）', { source: source.id, error: e instanceof Error ? e.message : String(e) })
+  }
+}
+
 async function _webViewFetchHTMLLocked(source: Source, url: string, options?: WebViewFetchOptions): Promise<WebViewFetchResult> {
   const t0 = Date.now()
   // 池化 controller：CF 已通过的同源后续请求会复用此容器里的 cookie，直接秒过。
@@ -450,25 +552,30 @@ async function _webViewFetchHTMLLocked(source: Source, url: string, options?: We
   const controller = entry.controller
   log.debug('webview', `取页 ${url}`, { source: source.id })
   try {
-    // 1) dispatchNavigation：同源 linkActivated 导航已派发
-    const dispatched = await withTimeout(
-      dispatchNavigation(entry, source, url),
-      DEFAULT_LOAD_TIMEOUT_MS,
-      `WebView 导航派发超时（${DEFAULT_LOAD_TIMEOUT_MS}ms）`
-    )
-    if (!dispatched) throw new Error(`WebView 导航派发返回 false: ${url}`)
+    // 1) dispatchNavigation：派发导航，返回 CF 轮询该用的呈现模式（eagerVisible / offscreen）。
+    //    失败直接抛错（dispatch 内部对 loadURL/loadHTML/click 失败都 throw）。
+    const navMode = await withTimeout(dispatchNavigation(entry, source, url), DEFAULT_LOAD_TIMEOUT_MS, `WebView 导航派发超时（${DEFAULT_LOAD_TIMEOUT_MS}ms）`)
+    const cf = source.challenge as { kind?: string; webview?: { visibleChallenge?: boolean } } | undefined
 
-    // 2) 等旧文档被替换（nav token 消失），之后的一切检查才落在新文档上
-    await waitForDocumentSwap(controller, source, url)
-
-    // 3) waitForLoad：新文档 didFinish，body 就绪
-    const loaded = await withTimeout(controller.waitForLoad(), DEFAULT_LOAD_TIMEOUT_MS, `WebView waitForLoad 超时（${DEFAULT_LOAD_TIMEOUT_MS}ms）`)
-    if (!loaded) throw new Error(`WebView waitForLoad 返回 false: ${url}`)
-
-    // 4) CF 挑战轮询（仅当源声明 challenge.kind='cloudflare'）
-    if ((source.challenge as { kind?: string } | undefined)?.kind === 'cloudflare') {
-      await waitForCloudflareChallenge(controller, source, url)
-      // 5) 兜底二次导航：CF 通过瞬间会换 document，再等一次让 getHTML 落在稳定 DOM 上
+    if (navMode === 'eagerVisible') {
+      // visibleChallenge：严格镜像裸探针 runVisibleProbe——loadURL 后【立刻】present + 轮询，present 之前绝不插
+      // waitForDocumentSwap / waitForLoad（清掉 cf_clearance 后是【新鲜重型】CF 挑战，离屏窗口会节流挑战 JS）。
+      // 等待逻辑也整套照搬探针：先 sleep 再轻量查、命中即放行，不跑 isChallenge/stuck 状态机（详见 waitForVisibleChallenge）。
+      await waitForVisibleChallenge(controller, source, url, readMaxWaitMs(source) ?? DEFAULT_CF_WAIT_MS)
+    } else {
+      // offscreen（同源点击 / synthetic 复用 / 轻量档）：挑战轻或已有 clearance，可先等文档替换 + 新文档就绪
+      // 2) 等旧文档被替换（nav token 消失），之后的一切检查才落在新文档上
+      await waitForDocumentSwap(controller, source, url)
+      // 3) waitForLoad：新文档 didFinish，body 就绪
+      const loaded = await withTimeout(controller.waitForLoad(), DEFAULT_LOAD_TIMEOUT_MS, `WebView waitForLoad 超时（${DEFAULT_LOAD_TIMEOUT_MS}ms）`)
+      if (!loaded) throw new Error(`WebView waitForLoad 返回 false: ${url}`)
+      // 4) CF 挑战轮询：离屏轮询，挑战滞留时由轮询逻辑自行延时升级可见。
+      if (cf?.kind === 'cloudflare') {
+        await waitForCloudflareChallenge(controller, source, url)
+      }
+    }
+    // 5) 兜底二次导航：CF 通过瞬间会换 document，再等一次让 getHTML 落在稳定 DOM 上
+    if (cf?.kind === 'cloudflare') {
       await controller.waitForLoad().catch(e => log.warn('webview', '二次 waitForLoad 抛错', { error: String(e) }))
     }
 
@@ -499,6 +606,8 @@ async function _webViewFetchHTMLLocked(source: Source, url: string, options?: We
       htmlHead: html.slice(0, 300).replace(/\s+/g, ' ').trim(),
       htmlTail: html.slice(-300).replace(/\s+/g, ' ').trim()
     })
+    // 过盾成功：抽该 origin 全部 cookie 存令牌，供后续原生静默 fetch 复用（CF 不查 TLS，详见 cfClearance.ts）。
+    await persistClearance(source, finalUrl, controller)
     // status 用 200 占位：成功拿到 HTML 即视为 200。CF 失败在轮询里抛错。
     return { status: 200, body: html, finalUrl }
   } catch (e) {
@@ -517,37 +626,92 @@ async function _webViewFetchHTMLLocked(source: Source, url: string, options?: We
 
 type HtmlVerdict = 'success' | 'stuck' | 'unknown'
 
-async function probeHtml(controller: WebViewController, source: Source): Promise<HtmlVerdict> {
-  const html = await controller.getHTML().catch(() => null)
-  if (!html || html.length < 512) return 'unknown'
+// 可见挑战等待：严格镜像裸探针 runVisibleProbe（WebViewProbe/manualProbe.ts）。它在同设备 5.5s 稳过，
+// 旧的 waitForCloudflareChallenge 同设备却反复 90s 超时（真机日志：present 后到超时中间一条挑战日志都没有，
+// 页面卡在挑战态从未推进到真内容 = 挑战 JS 被节流跑不完）。逐字对照，旧逻辑有三处会节流/误判挑战 JS：
+//   1) 进循环【立刻】evaluateJavaScript（t≈0 就拿脚本抢主线程，正打断挑战 JS 初始化）——探针是【先 sleep 再查】；
+//   2) 每轮序列化整页 outerHTML + 跑多条挑战信号正则 + 包 withTimeout（重型，在挑战窗口抢主线程）——探针只做轻量判定；
+//   3) isChallenge/stuck/successStreak/evidencedChallenge 状态机（任一状态误判就卡死到超时）——探针只看「真内容到没到」。
+// 这里照搬探针：present 立刻可见（不 await）→ 轮询【先 sleep 再查】→ 命中 successMarkers 即 dismiss 放行；
+// 不跑任何挑战态状态机。真内容判定走 source.json 的 successMarkers（站点特征不进业务代码，architecture-principles 红线）。
+async function waitForVisibleChallenge(controller: WebViewController, source: Source, url: string, maxWaitMs: number): Promise<void> {
+  if (maxWaitMs <= 0) return
   const markers = successMarkersFor(source)
-  if (markers.length > 0 && markers.every(re => re.test(html))) return 'success'
-  if (HTML_STRICT_CHALLENGE.test(html) && HTML_STUCK_BODY.test(html) && HTML_STUCK_META.test(html)) {
-    return 'stuck'
+  if (markers.length === 0) throw new Error('visibleChallenge 源未配置 successMarkers，可见轮询无从判定真内容')
+  const markerSources = JSON.stringify(markers.map(m => m.source))
+  // 轻量判定：页内对 outerHTML 求 successMarkers 正则、只回传布尔（绝不跨桥搬 HTML）。挑战 interstitial 期页面
+  // 很小、序列化可忽略；真页面到位时这一次序列化后立即 dismiss、无后续开销。比旧检测脚本省掉一整套挑战信号探测。
+  const checkScript = `return (function(){
+    try {
+      var html = document.documentElement ? document.documentElement.outerHTML : ''
+      if (html.length < 512) return false
+      var pats = ${markerSources}
+      for (var i = 0; i < pats.length; i++) { if (!new RegExp(pats[i]).test(html)) return false }
+      return true
+    } catch (e) { return false }
+  })()`
+  const startedAt = Date.now()
+  const presentedAt = Date.now()
+  log.info('webview', 'visibleChallenge：present 可见 + 轻量轮询真内容（镜像裸探针 ~5.5s）', {
+    source: source.id,
+    url,
+    maxWaitMs,
+    pollMs: CF_VISIBLE_POLL_INTERVAL_MS
+  })
+  void controller.present({ fullscreen: true, navigationTitle: '请完成 Cloudflare 验证' })
+
+  while (Date.now() - startedAt < maxWaitMs) {
+    // 先 sleep 再查：把主线程整段让给挑战 JS（含 loadURL 后那一拍），绝不在 t≈0 抢它——这正是旧逻辑反复超时的真凶。
+    await sleep(CF_VISIBLE_POLL_INTERVAL_MS)
+    const hit = await controller.evaluateJavaScript<boolean>(checkScript).catch(() => false)
+    if (hit !== true) continue
+    // present 落定保护：自 present 起至少可见 CF_MIN_VISIBLE_MS，dismiss 才不会撞在呈现动画途中被忽略、窗口留死。
+    // 本循环首查已在 present 后 ≥1.5s，天然满足，这里只是兜底。
+    const visibleFor = Date.now() - presentedAt
+    if (visibleFor < CF_MIN_VISIBLE_MS) await sleep(CF_MIN_VISIBLE_MS - visibleFor)
+    controller.dismiss()
+    log.info('webview', 'CF 通过（可见真内容到位）', { source: source.id, ms: Date.now() - startedAt })
+    return
   }
-  return 'unknown'
+  controller.dismiss()
+  throw new Error(`CF 挑战等待超时（${maxWaitMs}ms），疑似站点风控升级`)
 }
 
 async function waitForCloudflareChallenge(controller: WebViewController, source: Source, url: string): Promise<void> {
   const maxWaitMs = readMaxWaitMs(source) ?? DEFAULT_CF_WAIT_MS
   if (maxWaitMs <= 0) return
+  // 离屏路径（同源点击 / synthetic 复用 / 轻量档 jmcomic）：挑战轻或已带 cf_clearance，先离屏轮询、滞留再升级可见。
+  // 检测脚本页内算 success/stuck/signals、只回传小对象，全程不 getHTML（避免重型返回值跨桥节流 CF 挑战 JS）。
+  // visibleChallenge 源不走这里——它专用 waitForVisibleChallenge（present 立刻可见 + 先 sleep 再轻量查，镜像裸探针）。
+  const markers = successMarkersFor(source)
+  const checkScript = buildCfCheckScript(markers)
+  const pollMs = CF_POLL_INTERVAL_MS
   const startedAt = Date.now()
   let detected = false
   let consecutiveErrors = 0
   let pollCount = 0
   let presented = false
-  // 2 轮一致 success 才确认放行，避免 navigation 瞬间 DOM 半替换的竞态。
+  // 最近一次 present() 的时刻；dismiss 前据此补足最小可见时长，规避「present 未落定 → dismiss 被忽略」。
+  let presentedAt = 0
+  // 2 轮一致 success 才放行，避免 navigation 瞬间 DOM 半替换的竞态。
   let successStreak = 0
   // 任何时刻一旦见过 stuck 或 DOM 强挑战信号，就「锁住」必须靠 HTML success 或超时收尾——
   // 永久禁用 unknown-fallback 放行，避免误把 interstitial 当真页面、并把用户的 present 弹窗误关。
   let evidencedChallenge = false
+  // 呈现后关闭：保证自最近一次 present 起至少可见 CF_MIN_VISIBLE_MS，否则 dismiss 会撞在动画途中被忽略、窗口留死。
+  const dismissIfPresented = async (): Promise<void> => {
+    if (!presented) return
+    const visibleFor = Date.now() - presentedAt
+    if (visibleFor < CF_MIN_VISIBLE_MS) await sleep(CF_MIN_VISIBLE_MS - visibleFor)
+    controller.dismiss()
+  }
 
   while (Date.now() - startedAt < maxWaitMs) {
     pollCount += 1
     let parsed: CfCheckResult | null = null
 
     try {
-      const result = await withTimeout(controller.evaluateJavaScript<unknown>(CF_CHECK_SCRIPT), CF_CHECK_TIMEOUT_MS, 'CF 检测脚本超时')
+      const result = await withTimeout(controller.evaluateJavaScript<unknown>(checkScript), CF_CHECK_TIMEOUT_MS, 'CF 检测脚本超时')
       consecutiveErrors = 0
       if (!result || typeof result !== 'object') {
         throw new CloudflareFatalError(`CF 检测脚本返回非预期类型: ${typeof result}`)
@@ -557,33 +721,36 @@ async function waitForCloudflareChallenge(controller: WebViewController, source:
       if (e instanceof CloudflareFatalError) throw e
       consecutiveErrors++
       if (consecutiveErrors >= 3) {
-        if (presented) controller.dismiss()
+        await dismissIfPresented()
         throw new Error(`CF 检测脚本连续失败 3 次: ${e instanceof Error ? e.message : String(e)}`)
       }
-      await sleep(CF_POLL_INTERVAL_MS)
+      await sleep(pollMs)
       continue
     }
 
     if (parsed.__error) {
-      if (presented) controller.dismiss()
+      await dismissIfPresented()
       throw new CloudflareFatalError(`CF 检测脚本内部错误: ${parsed.__error}`)
     }
     if (parsed.isInteractive) {
       if (!presented) {
         presented = true
+        presentedAt = Date.now()
         log.warn('webview', '需要 Turnstile 人工验证，弹出 WebView', { source: source.id, url })
         void controller.present({ fullscreen: true, navigationTitle: '请完成 Cloudflare 验证' })
       }
-      await sleep(CF_POLL_INTERVAL_MS)
+      await sleep(pollMs)
       continue
     }
 
-    // 关键路径：每轮抓 HTML 做 ground-truth 判定。
-    const verdict = await probeHtml(controller, source)
+    // success/stuck 已在检测脚本里【页内】算好（不再 getHTML 跨桥）。
+    const verdict: HtmlVerdict = parsed.success ? 'success' : parsed.stuck ? 'stuck' : 'unknown'
     if (verdict === 'success') {
       successStreak += 1
-      if (successStreak >= 2) {
-        if (presented) controller.dismiss()
+      // 离屏路径 2 轮一致 success 才放行，避免 navigation 瞬间 DOM 半替换的竞态把上一页误判成功。
+      const confirmNeeded = 2
+      if (successStreak >= confirmNeeded) {
+        await dismissIfPresented()
         log.info('webview', 'CF 通过（HTML marker 命中）', {
           source: source.id,
           pollCount,
@@ -599,14 +766,20 @@ async function waitForCloudflareChallenge(controller: WebViewController, source:
     successStreak = 0
     if (verdict === 'stuck') {
       evidencedChallenge = true
-      if (!presented) {
+      const stuckElapsed = Date.now() - startedAt
+      // 给几秒看能否静默自过；过不了就呈现可见 WebView，让挑战 JS 前台全速跑 + 用户手动完成。
+      if (stuckElapsed >= STUCK_PRESENT_DELAY_MS && !presented) {
         presented = true
-        log.warn('webview', 'CF interstitial 卡在「验证成功等待响应」，弹出请求用户手势', {
+        presentedAt = Date.now()
+        log.warn('webview', 'CF 安全验证未自动通过，呈现 WebView 请在可见页内完成验证', {
           source: source.id,
-          pollCount
+          pollCount,
+          ms: stuckElapsed
         })
-        void controller.present({ fullscreen: true, navigationTitle: '请点击页面继续加载' })
+        void controller.present({ fullscreen: true, navigationTitle: '请完成安全验证' })
       }
+      await sleep(pollMs)
+      continue
     }
 
     // DOM 强信号：form/path/title+body 才认定「仍在挑战」。
@@ -646,25 +819,26 @@ async function waitForCloudflareChallenge(controller: WebViewController, source:
       const elapsed = Date.now() - startedAt
       if (!presented && elapsed > CF_INTERACTIVE_FALLBACK_MS) {
         presented = true
+        presentedAt = Date.now()
         log.warn('webview', `${CF_INTERACTIVE_FALLBACK_MS}ms 未自动通过 CF，弹出 WebView 让用户人工处理`, {
           source: source.id,
           signals
         })
         void controller.present({ fullscreen: true, navigationTitle: '请完成 Cloudflare 验证' })
       }
-      await sleep(CF_POLL_INTERVAL_MS)
+      await sleep(pollMs)
       continue
     }
 
     if (parsed.readyState && parsed.readyState !== 'complete') {
-      await sleep(CF_POLL_INTERVAL_MS)
+      await sleep(pollMs)
       continue
     }
     // 走到这里：DOM 无强信号 + 文档就绪 + HTML verdict ∈ {unknown}。
     // 仅当**从未见过 stuck 或 DOM 强挑战信号**才允许 fallback 放行——否则 interstitial 会被误放。
     const elapsed = Date.now() - startedAt
     if (!evidencedChallenge && elapsed >= HTML_FALLBACK_UNKNOWN_MS) {
-      if (presented) controller.dismiss()
+      await dismissIfPresented()
       log.warn('webview', `HTML marker 未命中但 DOM 无强信号 ${HTML_FALLBACK_UNKNOWN_MS}ms+，fallback 放行`, {
         source: source.id,
         host: primaryHost(source),
@@ -674,10 +848,10 @@ async function waitForCloudflareChallenge(controller: WebViewController, source:
       })
       return
     }
-    await sleep(CF_POLL_INTERVAL_MS)
+    await sleep(pollMs)
   }
 
-  if (presented) controller.dismiss()
+  await dismissIfPresented()
   throw new Error(`CF 挑战等待超时（${maxWaitMs}ms），疑似站点风控升级`)
 }
 

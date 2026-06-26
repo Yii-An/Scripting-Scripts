@@ -1,4 +1,4 @@
-import { Button, Text, VStack, useEffect, useState } from 'scripting'
+import { Button, HStack, Spacer, Text, VStack, useEffect, useState } from 'scripting'
 
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { type UpdateCheck, checkSourceUpdate, commitImport } from '../services/sourceImporter'
@@ -38,6 +38,8 @@ export function SourceDetailScreen({ source: sourceProp }: { source: Source }) {
   const [source, setSource] = useState<Source>(() => findSourceById(sourceProp.id) ?? sourceProp)
   useEffect(() => subscribeSources(() => setSource(findSourceById(sourceProp.id) ?? sourceProp)), [])
   const [checking, setChecking] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   // 检查更新全流程（自带对话框）：重拉比对 → 无更新提示 / 升级确认 → 落盘热插。原在书源列表的右键菜单，
   // 移除长按/右键后改由此处承载。commitImport → subscribeSources → 本屏与列表自动重渲为新 version。
@@ -66,7 +68,38 @@ export function SourceDetailScreen({ source: sourceProp }: { source: Source }) {
     }
   }
 
+  // 强制拉取：无视版本号直接重拉远端并覆盖本地。解决「本地 source.json 改了但 version 没 bump，
+  // checkSourceUpdate 的 hasUpdate(= 远端 version 严格大于本地) 为 false、检查更新拉不动」的开发场景。
+  // 复用 checkSourceUpdate 拿候选（含 id 一致校验 + hostDiff），跳过 hasUpdate 门，确认后直接 commitImport。
+  async function onForcePull() {
+    if (checking || pulling) return
+    setPulling(true)
+    try {
+      const res = await checkSourceUpdate(source.id)
+      const ok = await Dialog.confirm({
+        title: '强制拉取并覆盖？',
+        message: `${buildUpgradeMessage(res)}\n\n无视版本号，直接用远端规则覆盖本地（本地改了但版本号没变时用）。`,
+        confirmLabel: '强制覆盖',
+        cancelLabel: '取消'
+      })
+      if (!ok) return
+      await commitImport(res.candidate)
+      await Dialog.alert({ title: '已覆盖', message: `${res.candidate.source.name} 已用远端规则覆盖（v${res.candidate.source.version}）。` })
+    } catch (e) {
+      await Dialog.alert({ title: '强制拉取失败', message: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setPulling(false)
+    }
+  }
+
   const remoteMeta = getRemoteSourceMeta(source.id)
+
+  async function onCopyOrigin() {
+    if (!remoteMeta) return
+    await Pasteboard.setString(remoteMeta.originUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   const hosts = Array.isArray(source.host) ? source.host : [source.host]
   const headerCount = Object.keys(source.headers ?? {}).length
@@ -80,19 +113,43 @@ export function SourceDetailScreen({ source: sourceProp }: { source: Source }) {
           header="来源"
           footer={
             <Text font="caption" foregroundStyle={MUTED}>
-              升级会覆盖当前规则；删除请在书源列表点右上「编辑」
+              升级会覆盖当前规则；删除请在书源列表点右上「编辑」。强制拉取无视版本号直接覆盖，用于本地改了但版本号没变的调试。
             </Text>
           }
         >
-          <Row label="来源" value={remoteMeta.originUrl} mono />
+          <VStack alignment="leading" spacing={4}>
+            <Text font="caption" foregroundStyle={MUTED}>
+              来源
+            </Text>
+            <HStack spacing={8}>
+              <Text font="footnote" monospaced>
+                {remoteMeta.originUrl}
+              </Text>
+              <Spacer />
+              <Button
+                title={copied ? '已复制' : '复制'}
+                systemImage={copied ? 'checkmark' : 'doc.on.doc'}
+                action={() => void onCopyOrigin()}
+                controlSize="small"
+                foregroundStyle={copied ? MUTED : ACCENT}
+              />
+            </HStack>
+          </VStack>
           <Row label="导入时间" value={formatTs(remoteMeta.importedAt)} />
           <Row label="最近更新" value={formatTs(remoteMeta.updatedAt)} />
           <Button
             title={checking ? '检查中…' : '检查更新'}
             systemImage="arrow.triangle.2.circlepath"
             action={() => void onCheckUpdate()}
-            disabled={checking}
+            disabled={checking || pulling}
             foregroundStyle={checking ? MUTED : ACCENT}
+          />
+          <Button
+            title={pulling ? '拉取中…' : '强制拉取（覆盖本地）'}
+            systemImage="arrow.down.circle"
+            action={() => void onForcePull()}
+            disabled={checking || pulling}
+            foregroundStyle={pulling ? MUTED : ACCENT}
           />
         </ScrollSection>
       ) : null}

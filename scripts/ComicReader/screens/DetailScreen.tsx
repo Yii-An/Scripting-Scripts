@@ -1,5 +1,6 @@
 import { Button, HStack, Image, NavigationLink, ProgressView, Spacer, Text, VStack, useEffect, useMemo, useRef, useState } from 'scripting'
 
+import { CoverImage } from '../components/CoverImage'
 import { ScrollList, ScrollSection } from '../components/ScrollList'
 import { executeChapterList } from '../services/chapterListExecutor'
 import { executeDetail } from '../services/detailExecutor'
@@ -33,7 +34,6 @@ const MUTED: `#${string}` = '#8E8E93'
 const ERR: `#${string}` = '#FF3B30'
 const ACCENT: `#${string}` = '#5856D6'
 const HIGHLIGHT: `#${string}` = '#FFF7CC'
-const PLACEHOLDER: `#${string}` = '#E5E5EA'
 
 const COVER_W = 120
 const COVER_H = 160
@@ -202,33 +202,10 @@ export function DetailScreen({ book }: DetailScreenProps) {
 
   const displayTitle = detail?.title ?? book.title
   const displayCover = detail?.cover ?? book.cover ?? null
-  // useMemo 锁封面元素引用：DetailScreen 重渲非常频繁（加载完 markBindingVerified 立刻
-  // 触发 bookshelf listener 重渲一次、toast / 刷新 / 换源等都再渲），
-  // 不锁的话每次都重建 Image 节点 → 重走网络图加载 → 封面闪烁。
-  //
-  // placeholder 用「刚显示过的入参封面」而非默认图标：详情封面与列表封面是不同 URL 时
-  // （如 jm 列表缩略图 {id}_3x4.jpg / 详情原图 {id}.jpg），切换会重新走网络加载——
-  // 旧图已在缓存里瞬时可显，垫底后加载期间不闪默认占位。两处 URL 相同的源不受影响。
-  const coverImg = useMemo(() => {
-    const fallbackIcon = <Image systemName="photo" frame={{ width: COVER_W, height: COVER_H }} foregroundStyle={PLACEHOLDER} />
-    if (!displayCover) return fallbackIcon
-    const placeholder =
-      book.cover && book.cover !== displayCover ? (
-        <Image imageUrl={book.cover} frame={{ width: COVER_W, height: COVER_H }} resizable scaleToFit clipShape={{ type: 'rect', cornerRadius: 8 }} />
-      ) : (
-        fallbackIcon
-      )
-    return (
-      <Image
-        imageUrl={displayCover}
-        placeholder={placeholder}
-        frame={{ width: COVER_W, height: COVER_H }}
-        resizable
-        scaleToFit
-        clipShape={{ type: 'rect', cornerRadius: 8 }}
-      />
-    )
-  }, [displayCover, book.cover])
+  // 封面走 CoverImage（imageLoader 管线，带 per-source UA + Referer + cf_clearance）：CF 保护站点的封面也能取到。
+  // 内部用 UIImage state 锁定已加载位图，DetailScreen 频繁重渲（markBindingVerified / toast / 刷新 / 换源）都不重走网络、不闪烁。
+  // placeholderUrl=book.cover：详情原图与列表缩略图是不同 URL 时（如 jm），详情原图加载期间先用已缓存的列表封面垫底，不闪默认占位。
+  const coverImg = <CoverImage url={displayCover} sourceId={book.sourceId} width={COVER_W} height={COVER_H} cornerRadius={8} placeholderUrl={book.cover} />
 
   // 章节下载状态角标：DetailScreen 统一订阅一次，按 chapterId 派发给行——
   // 避免几百个 ChapterRow 各自订阅 downloadStore。
